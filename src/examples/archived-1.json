@@ -1,0 +1,10 @@
+{
+  "platform": "x",
+  "displayName": { "value": "Example Account", "confidence": 0.9, "source": "ocr" },
+  "handle": { "value": "example_user", "confidence": 0.95, "source": "ocr" },
+  "text": { "value": "Just shipped our new prototype after months of work. Thanks to everyone who helped test it!", "confidence": 0.92, "source": "ocr" },
+  "dates": { "value": [{ "isoDate": "2024-05-10", "raw": "May 10, 2024" }], "confidence": 0.88, "source": "ocr" },
+  "language": "en",
+  "ocrMs": 812,
+  "fieldsEdited": false
+}

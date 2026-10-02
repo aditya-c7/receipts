@@ -1,0 +1,3 @@
+UPSTASH_REDIS_REST_URL="https://REPLACE_ME.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="REPLACE_ME"
+WAYBACK_USER_AGENT="Receipts/1.0 (+http://localhost:3000; contact: you@example.com)"

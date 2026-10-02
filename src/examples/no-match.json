@@ -1,0 +1,10 @@
+{
+  "platform": "x",
+  "displayName": { "value": "Obscure Fan Account", "confidence": 0.8, "source": "ocr" },
+  "handle": { "value": "zzq_obscure_9912", "confidence": 0.9, "source": "ocr" },
+  "text": { "value": "Unverified rumor tonight that nobody else has posted about anywhere.", "confidence": 0.85, "source": "ocr" },
+  "dates": { "value": [{ "isoDate": "2025-06-01", "raw": "Jun 1, 2025" }], "confidence": 0.8, "source": "ocr" },
+  "language": "en",
+  "ocrMs": 688,
+  "fieldsEdited": false
+}

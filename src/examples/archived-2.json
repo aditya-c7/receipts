@@ -1,0 +1,10 @@
+{
+  "platform": "x",
+  "displayName": { "value": "City News Desk", "confidence": 0.9, "source": "ocr" },
+  "handle": { "value": "citynewsdesk", "confidence": 0.93, "source": "ocr" },
+  "text": { "value": "Breaking: downtown library reopens Saturday with extended weekend hours.", "confidence": 0.9, "source": "ocr" },
+  "dates": { "value": [{ "isoDate": "2023-11-02", "raw": "Nov 2, 2023" }], "confidence": 0.86, "source": "ocr" },
+  "language": "en",
+  "ocrMs": 764,
+  "fieldsEdited": false
+}

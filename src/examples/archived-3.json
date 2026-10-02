@@ -1,0 +1,10 @@
+{
+  "platform": "x",
+  "displayName": { "value": "Research Notes", "confidence": 0.88, "source": "ocr" },
+  "handle": { "value": "research_notes", "confidence": 0.91, "source": "ocr" },
+  "text": { "value": "New preprint is out: we compare three summarization baselines on long documents.", "confidence": 0.89, "source": "ocr" },
+  "dates": { "value": [{ "isoDate": "2024-01-18", "raw": "Jan 18, 2024" }], "confidence": 0.84, "source": "ocr" },
+  "language": "en",
+  "ocrMs": 901,
+  "fieldsEdited": false
+}

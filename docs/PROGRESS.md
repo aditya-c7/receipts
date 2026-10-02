@@ -1,0 +1,4 @@
+# PROGRESS
+
+- 2026-10-02 bootstrap: Stack S locked (Cloudflare Workers + Upstash Redis + D1). Skeleton up. Tracks A/B/C dispatched.
+- 2026-10-02 phase-1: 3 tracks landed + integrated. `typecheck && lint && test` green (16 files, 110 tests), `vite build` 70.4 kB gz (< 150 kB budget), `pnpm audit --prod` clean high/critical. Integration fixes: receipt server-recompute + client flow now use shared lib/match + lib/verdict + lib/wayback (no fallback copies); CDX from-only bound + Snowflake ID-time filter; SPEC ±50h window; missing date -> INSUFFICIENT_INPUT; vite 5.4.11 (vitest 2.1.8 compat); hono 4.13.12 + nanoid 5.1.16 (audit). Known gaps: no live-Wayback verification yet (needs user `wrangler d1 create` + Upstash creds in `.dev.vars`); OCR engine not yet wired to DropZone UI (lib ready, Tesseract lazy); e2e needs Playwright browsers (`pnpm exec playwright install`).

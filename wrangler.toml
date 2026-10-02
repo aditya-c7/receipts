@@ -1,0 +1,15 @@
+name = "receipts-api"
+main = "worker/api.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+WAYBACK_USER_AGENT = "Receipts/1.0 (+http://localhost:3000; contact: adityachitragar2.0@gmail.com)"
+
+[[d1_databases]]
+binding = "RECEIPTS_DB"
+database_name = "receipts-db"
+database_id = "REPLACE_WITH_WRANGLER_D1_ID"
+
+[dev]
+port = 8787
