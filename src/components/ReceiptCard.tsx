@@ -62,7 +62,8 @@ export default function ReceiptCard({ receipt, url }: ReceiptCardProps) {
       </p>
       <p className="mt-2 text-xs opacity-70">
         This receipt proves the quoted text existed in the archived capture at the time shown — not that the
-        screenshot is untouched. Archive coverage is partial — no match ≠ fake. Most posts are never archived.
+        screenshot is untouched. Archive coverage is partial — no archive match does not mean it is not real.
+        Most posts are never archived.
       </p>
     </section>
   );

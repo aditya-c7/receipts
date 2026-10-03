@@ -76,7 +76,13 @@ interface SearchApiOk {
   ok: true;
   cached: boolean;
   candidates: Candidate[];
-  coverage: { buckets: number; totalCaptures: number; truncated: boolean; handleHasAnyCaptures: boolean };
+  coverage: {
+    buckets: number;
+    totalCaptures: number;
+    truncated: boolean;
+    handleHasAnyCaptures: boolean;
+    repairedHandle?: string;
+  };
 }
 
 interface SnapshotApiOk {
@@ -144,6 +150,11 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
   }
 
   const ranked = rankByTimeConsistency(search.candidates, dateIso, claimedMinute).slice(0, MAX_SNAPSHOTS_PER_CHECK);
+  // Repaired handle (server fell back to an OCR-confusable variant):
+  // score with handleOK=false so the context cap applies, and flag it.
+  const repairedHandle = search.coverage.repairedHandle;
+  const handleOK = repairedHandle === undefined;
+  const repairFlag = repairedHandle !== undefined ? { repairedHandle } : {};
   if (ranked.length === 0) {
     return {
       code: 'NO_MATCH',
@@ -156,6 +167,7 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
         truncated: search.coverage.truncated,
         from: fromIso,
         to: toIso,
+        ...repairFlag,
       },
     };
   }
@@ -194,7 +206,7 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
         const dateOK = checkDateConsistent(dateIso as string, cand.idTimeMs);
         const tc = checkTimeConsistent(dateIso as string, claimedMinute, cand.idTimeMs);
         const gated = scorePair(claimedText, archivedText, {
-          handleOK: true,
+          handleOK,
           dateOK: dateOK === true,
           timeConsistent: tc,
         });
@@ -220,13 +232,14 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
     truncated: search.coverage.truncated,
     from: fromIso,
     to: toIso,
+    ...repairFlag,
   };
   if (!best) {
     // Snapshots all failed but candidates exist: searched, found pointers,
     // could not compare text.
     return decide({
       platform: 'x',
-      handleOk: true,
+      handleOk: handleOK,
       dateOk: null,
       hasDates: true,
       best: null,
@@ -238,7 +251,7 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
   const extractable = (best.archived.text ?? '').trim() !== '';
   return decide({
     platform: 'x',
-    handleOk: true,
+    handleOk: handleOK,
     dateOk: best.dateOK,
     hasDates: true,
     best: {

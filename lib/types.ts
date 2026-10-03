@@ -78,6 +78,8 @@ export interface Verdict {
     truncated: boolean;
     from: string;
     to: string;
+    /** Set when the server fell back to an OCR-confusable handle variant. */
+    repairedHandle?: string;
   };
   diff?: Array<{ op: 'eq' | 'del' | 'ins'; text: string }>;
 }

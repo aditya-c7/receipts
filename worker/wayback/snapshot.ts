@@ -1,13 +1,14 @@
-// Server-side Wayback snapshot fetch + extraction (server-only cheerio pass).
-// lib/wayback/snapshot.ts holds the pure extractor chain used by tests; this
-// module mirrors its order (ldjson > embeddedJson > og > classic > title)
-// for the Worker runtime.
+// Server-side Wayback snapshot fetch + extraction (server-only).
+// Extraction delegates to lib/wayback/snapshot.ts (ldjson > og > classic >
+// embeddedJson > title > none) so tested code is shipped code; the
+// Worker-side fetch/redirect-policy/content-type-gate/byte-cap/cache
+// wrappers live here.
 //
 // Safety: allowlisted hosts only, refuse cross-host redirects, content-type
 // gate, byte cap, timeout, Upstash/memory caching.
-import { load } from 'cheerio';
 import { SNAPSHOT_MAX_BYTES, SNAPSHOT_TIMEOUT_MS } from '../../lib/config';
 import type { ArchivedPost } from '../../lib/types';
+import { extractArchivedPost as extractLibPost } from '../../lib/wayback/snapshot';
 import { type Cache, snapKey, snapTtlSec } from '../cache/redis';
 
 export interface SnapshotEnv {
@@ -38,88 +39,10 @@ export function toPreviewUrl(archiveUrl: string): string {
     : archiveUrl;
 }
 
-function textOrNull(s: string | undefined): string | null {
-  if (!s) return null;
-  const t = s.replace(/\s+/g, ' ').trim();
-  return t ? t : null;
-}
-
-function tryParseJsonObjects(html: string): string[] {
-  // Collect candidate JSON blobs from <script> tags for embedded-state parsing.
-  const out: string[] = [];
-  const re = /<script[^>]*>([\s\S]{0,200000}?)<\/script>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const body = m[1] ?? '';
-    if (body.includes('full_text') || body.includes('"text"')) out.push(body);
-    if (out.length >= 5) break;
-  }
-  return out;
-}
-
-function extractEmbeddedJson(html: string): string | null {
-  for (const blob of tryParseJsonObjects(html)) {
-    const m =
-      blob.match(/"full_text"\s*:\s*"((?:[^"\\]|\\.)*)"/) ?? blob.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-    if (m && m[1]) {
-      try {
-        const decoded = JSON.parse(`"${m[1]}"`) as unknown;
-        if (typeof decoded === 'string') return textOrNull(decoded);
-      } catch {
-        // fall through
-      }
-    }
-  }
-  return null;
-}
-
-/** DOM-free-ish extraction over server-fetched HTML (cheerio runs in Workers via nodejs_compat). */
-export function extractArchivedPost(html: string, _url: string): ArchivedPost {
-  const $ = load(html);
-
-  // 1. ld+json articleBody
-  const ldNodes = $('script[type="application/ld+json"]');
-  for (let i = 0; i < ldNodes.length; i++) {
-    try {
-      const raw = $(ldNodes[i]).text();
-      if (!raw) continue;
-      const parsed: unknown = JSON.parse(raw);
-      const items = Array.isArray(parsed) ? parsed : [parsed];
-      for (const item of items) {
-        if (typeof item === 'object' && item !== null) {
-          const rec = item as Record<string, unknown>;
-          const body = rec['articleBody'];
-          if (typeof body === 'string' && body.trim()) {
-            return { text: textOrNull(body), extractor: 'ldjson' };
-          }
-        }
-      }
-    } catch {
-      // keep trying
-    }
-  }
-
-  // 2. embedded JSON state (full_text)
-  const embedded = extractEmbeddedJson(html);
-  if (embedded) return { text: embedded, extractor: 'embeddedJson' };
-
-  // 3. OpenGraph description
-  const og = $('meta[property="og:description"]').attr('content') ?? $('meta[name="description"]').attr('content');
-  const ogText = textOrNull(og);
-  if (ogText) return { text: ogText, extractor: 'og' };
-
-  // 4. classic tweet selectors
-  const classic =
-    textOrNull($('[data-testid="tweetText"]').first().text()) ??
-    textOrNull($('.tweet-text').first().text()) ??
-    textOrNull($('#tweet-content').first().text());
-  if (classic) return { text: classic, extractor: 'classic' };
-
-  // 5. title fallback (strip " / X" suffixes)
-  const title = textOrNull($('title').first().text())?.replace(/\s*\/\s*X\s*$/i, '') ?? null;
-  if (title && title.length > 8) return { text: title, extractor: 'title' };
-
-  return { text: null, extractor: 'none' };
+/** Delegated extractor (lib order: ldjson > og > classic > embeddedJson > title > none). */
+export function extractArchivedPost(html: string, _url?: string): ArchivedPost {
+  void _url;
+  return extractLibPost(html);
 }
 
 async function fetchWithRedirectPolicy(url: string, userAgent: string): Promise<Response> {

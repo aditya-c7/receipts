@@ -9,7 +9,13 @@ WAYBACK_USER_AGENT = "Receipts/1.0 (+http://localhost:3000; contact: adityachitr
 [[d1_databases]]
 binding = "RECEIPTS_DB"
 database_name = "receipts-db"
-database_id = "REPLACE_WITH_WRANGLER_D1_ID"
+database_id = "298d4c31-c77c-4182-8fb8-cceff62f5682"
+migrations_dir = "migrations"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
 
 [dev]
 port = 8787

@@ -12,3 +12,10 @@
 10. Boring pinned libs. `pnpm audit` clean high/critical.
 
 Ground rules: screenshot pixels never leave device; OCR text leaves only on explicit "Create receipt"; missing archive proves nothing — never output fake-verdict; receipt proves "text X existed in archive Y at Z with S", not screenshot untouched; zero-cost; good citizen to archive.org (UA + contact, cache, backoff ≤3 concurrency, credit + donate link); user edits re-run, flagged on receipts.
+
+## Windows env note
+- `pnpm` lives in `%USERPROFILE%\.npm-global` (corepack shims unwritable without admin). Prefix package-manager commands with `$env:PATH="$env:USERPROFILE\.npm-global;$env:PATH";` or set PATH for the session.
+- `pnpm dev:all` starts web (vite :5173) + API (`wrangler dev` :8787) together; vite proxies `/api` → 127.0.0.1:8787. `pnpm dev` is web-only, `pnpm dev:worker` is API-only.
+- One-command prod parity: `wrangler dev`/`deploy` also serves `dist/` + API from `wrangler.toml` `[assets]` (SPA fallback; `/api/*` runs the Worker first). Run `pnpm build` before `wrangler deploy`. `pnpm deploy` is dry-run only; remove `--dry-run` for a real deploy.
+- D1: `worker/db/schema.sql` is the source copy; `migrations/0001_schema.sql` is the byte-identical wrangler copy (`migrations_dir = "migrations"`). Local verify: `wrangler d1 migrations list receipts-db --local`. Never touch remote without being asked.
+- Never commit `.dev.vars` (gitignored; overrides `[vars]` in `wrangler dev`).

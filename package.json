@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "dev:worker": "wrangler dev worker/api.ts --port 8787",
+    "dev:all": "concurrently -k -n web,api \"vite\" \"wrangler dev worker/api.ts --port 8787\"",
+    "deploy": "vite build && wrangler deploy --dry-run",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
@@ -31,6 +33,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
+    "concurrently": "10.0.5",
     "@tailwindcss/vite": "4.0.14",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "16.2.0",
@@ -53,6 +56,6 @@
     "typescript-eslint": "8.18.2",
     "vite": "5.4.11",
     "vitest": "2.1.8",
-    "wrangler": "3.112.0"
+    "wrangler": "4.147.0"
   }
 }

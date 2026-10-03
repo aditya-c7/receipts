@@ -1,15 +1,23 @@
 // CDX search against the Wayback Machine (server-side only).
 //
-// Deliberate local implementation (see docs/DECISIONS.md): wildcard prefix
-// queries + from-only bound + Snowflake ID-time filter. lib/wayback/* holds
-// the pure, unit-tested primitives (snowflake/buckets/urls/cdx-parse); the
+// SPEC ID-prefix-bucket discovery via lib/wayback/* pure primitives; the
 // fetch orchestration lives here because it needs Worker fetch + cache.
 import {
   CDX_LIMIT,
   CDX_TIMEOUT_MS,
   SEARCH_MAX_BUCKETS,
 } from '../../lib/config';
+import { repairCandidates } from '../../lib/ocr/confusables';
 import type { Candidate } from '../../lib/types';
+import { idsToPrefixBuckets } from '../../lib/wayback/buckets';
+import {
+  buildCdxUrl,
+  dedupeByTweetId,
+  filterByIdTime,
+  parseCdxJson,
+} from '../../lib/wayback/cdx';
+import { idToMs, msToMaxId, msToMinId } from '../../lib/wayback/snowflake';
+import { archiveUrl, extractTweetId } from '../../lib/wayback/urls';
 import { type Cache, buildQueryKey, cdxKey, cdxTtlSec } from '../cache/redis';
 
 export interface CdxEnv {
@@ -23,6 +31,8 @@ export interface CoverageInfo {
   totalCaptures: number;
   truncated: boolean;
   handleHasAnyCaptures: boolean;
+  /** OCR-confusable variant that actually had captures (original had none). */
+  repairedHandle?: string;
 }
 
 export interface CdxResult {
@@ -32,18 +42,6 @@ export interface CdxResult {
 }
 
 const CDX_ENDPOINT = 'https://web.archive.org/cdx/search/cdx';
-const TWEET_ID_RE = /\/status\/(\d{1,25})/;
-const SNOWFLAKE_EPOCH = 1288834974657n;
-
-/** Tweet Snowflake -> created-at ms (IDs exceed 2^53, so BigInt; result fits in f64). */
-export function snowflakeToMs(idStr: string): number {
-  try {
-    const ts = (BigInt(idStr) >> 22n) + SNOWFLAKE_EPOCH;
-    return Number(ts);
-  } catch {
-    return 0;
-  }
-}
 
 function toCdxTs(ms: number): string {
   const d = new Date(ms);
@@ -52,82 +50,6 @@ function toCdxTs(ms: number): string {
     `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}` +
     `${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`
   );
-}
-
-/**
- * Candidate discovery (few-users simplification; see docs/DECISIONS.md).
- * One CDX query per host (x.com, twitter.com) with a capture-time `from=`
- * lower bound ONLY — never a `to=` upper bound: a capture cannot predate
- * the post but can postdate it by years. Exact tweet-time filtering happens
- * below via Snowflake ID decode, which the CDX API cannot do server-side.
- */
-export function buildCdxRequests(handle: string, fromMs: number, _toMs: number): string[] {
-  const h = handle.toLowerCase();
-  const hosts = [`x.com/${h}/status`, `twitter.com/${h}/status`];
-  const out: string[] = [];
-  for (const host of hosts) {
-    const q = new URLSearchParams({
-      url: `${host}/*`,
-      from: toCdxTs(fromMs),
-      output: 'json',
-      filter: 'statuscode:200',
-      collapse: 'urlkey',
-      limit: String(CDX_LIMIT),
-    });
-    out.push(`${CDX_ENDPOINT}?${q.toString()}`);
-    if (out.length >= SEARCH_MAX_BUCKETS) return out;
-  }
-  return out;
-}
-
-/** Parse CDX output=json (array-of-arrays with header row) into Candidates. */
-export function parseCdxResponse(json: unknown): Candidate[] {
-  if (!Array.isArray(json) || json.length < 2) return [];
-  const rows = json.slice(1);
-  const out: Candidate[] = [];
-  for (const r of rows) {
-    if (!Array.isArray(r) || r.length < 5) continue;
-    const ts = String(r[1] ?? '');
-    const original = String(r[2] ?? '');
-    const statusCode = Number(r[4] ?? 0);
-    if (!/^\d{14}$/.test(ts)) continue;
-    const m = original.match(TWEET_ID_RE);
-    if (!m || !m[1]) continue;
-    const tweetId = m[1];
-    out.push({
-      tweetId,
-      idTimeMs: snowflakeToMs(tweetId),
-      snapshotTs: ts,
-      originalUrl: original,
-      archiveUrl: `https://web.archive.org/web/${ts}id_/${original}`,
-      statusCode,
-    });
-  }
-  return out;
-}
-
-/** Dedupe on originalUrl|snapshotTs, keeping first occurrence. */
-export function dedupeCandidates(cands: Candidate[]): Candidate[] {
-  const seen = new Set<string>();
-  const out: Candidate[] = [];
-  for (const c of cands) {
-    const k = `${c.originalUrl}|${c.snapshotTs}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(c);
-  }
-  return out;
-}
-
-/** Local time-consistency rank: in-window first, then nearest to window center. */
-export function rankByTimeConsistency(cands: Candidate[], fromMs: number, toMs: number): Candidate[] {
-  const center = (fromMs + toMs) / 2;
-  return [...cands].sort((a, b) => {
-    const aIn = a.idTimeMs >= fromMs && a.idTimeMs <= toMs ? 0 : 1;
-    const bIn = b.idTimeMs >= fromMs && b.idTimeMs <= toMs ? 0 : 1;
-    if (aIn !== bIn) return aIn - bIn;
-    return Math.abs(a.idTimeMs - center) - Math.abs(b.idTimeMs - center);
-  });
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -214,43 +136,137 @@ export async function fetchCandidates(
       // ignore cache errors
     }
     const ua = env.WAYBACK_USER_AGENT || 'Receipts/1.0 (+contact: receipts@example.com)';
-    const requests = buildCdxRequests(handle, fromMs, toMs);
-    const settled = await Promise.all(
-      requests.map(async (url) => {
-        try {
-          const res = await fetchCdxWithPolicy(url, ua);
-          const json: unknown = await res.json();
-          return parseCdxResponse(json);
-        } catch {
-          return [] as Candidate[];
+
+    /** Fetch one CDX bucket URL → Candidates (never throws; [] on failure). */
+    async function fetchBucket(url: string): Promise<Candidate[]> {
+      try {
+        const res = await fetchCdxWithPolicy(url, ua);
+        const json: unknown = await res.json();
+        const rows = parseCdxJson(json);
+        const out: Candidate[] = [];
+        for (const row of rows) {
+          const tweetId = extractTweetId(row.original);
+          if (!tweetId) continue;
+          let idTimeMs: number;
+          try {
+            idTimeMs = idToMs(tweetId);
+          } catch {
+            // Undecodable (e.g. pre-Snowflake): mark 0 and keep below.
+            idTimeMs = 0;
+          }
+          out.push({
+            tweetId,
+            idTimeMs,
+            snapshotTs: row.timestamp,
+            originalUrl: row.original,
+            archiveUrl: archiveUrl(row.timestamp, row.original),
+            statusCode: row.statuscode,
+          });
         }
-      }),
-    );
-    let truncated = false;
-    for (const list of settled) {
-      if (list.length >= CDX_LIMIT) truncated = true;
+        return out;
+      } catch {
+        return [];
+      }
     }
-    const merged = dedupeCandidates(settled.flat());
-    // Exact tweet-time filter via Snowflake ID decode (CDX can't do this).
-    // idTimeMs === 0 means undecodable (e.g. pre-2010 non-Snowflake IDs):
-    // keep those rather than dropping them.
-    const inWindow = merged.filter(
-      (c) => c.idTimeMs === 0 || (c.idTimeMs >= fromMs && c.idTimeMs <= toMs),
-    );
-    const ranked = rankByTimeConsistency(inWindow, fromMs, toMs).slice(0, CDX_LIMIT);
+
+    /**
+     * Fetch bucket URLs with capped concurrency (good citizenship: smooths
+     * bursts against the archive's ~60 req/min average ceiling instead of
+     * firing the whole window at once).
+     */
+    async function fetchBuckets(urls: string[]): Promise<Candidate[][]> {
+      const out: Candidate[][] = new Array(urls.length);
+      let cursor = 0;
+      async function worker(): Promise<void> {
+        while (cursor < urls.length) {
+          const i = cursor;
+          cursor += 1;
+          const url = urls[i];
+          if (url === undefined) continue;
+          out[i] = await fetchBucket(url);
+        }
+      }
+      const pool = Math.min(3, urls.length);
+      await Promise.all(Array.from({ length: pool }, () => worker()));
+      return out;
+    }
+
+    function finalize(lists: Candidate[][]): { ranked: Candidate[]; truncated: boolean } {
+      let truncated = false;
+      for (const list of lists) {
+        if (list.length >= CDX_LIMIT) truncated = true;
+      }
+      // Prefer earliest 200 per tweet id, collapsing x/twitter host variants.
+      const deduped = dedupeByTweetId(lists.flat());
+      // Exact tweet-time filter via Snowflake ID decode (CDX can't do this).
+      // filterByIdTime drops undecodable rows; preserve the pre-2010
+      // behavior (keep idTimeMs===0 rows) by re-appending them.
+      const decodable = deduped.filter((c) => c.idTimeMs !== 0);
+      const undecodable = deduped.filter((c) => c.idTimeMs === 0);
+      const inWindow = [...filterByIdTime(decodable, fromMs, toMs), ...undecodable];
+      return { ranked: inWindow.slice(0, CDX_LIMIT), truncated };
+    }
+
+    async function runFor(h: string): Promise<{ ranked: Candidate[]; truncated: boolean; buckets: number }> {
+      const lower = h.toLowerCase();
+      // Window -> Snowflake ID range -> <= SEARCH_MAX_BUCKETS decimal prefixes.
+      const minId = msToMinId(fromMs).toString();
+      const maxId = msToMaxId(toMs).toString();
+      const fromTs = toCdxTs(fromMs);
+      const prefixes = idsToPrefixBuckets(minId, maxId, SEARCH_MAX_BUCKETS);
+      // `from` is a CAPTURE-time lower bound only — never send `to=`: a
+      // capture cannot predate the post but can postdate it by years.
+      // x.com first; twitter.com only as fall-through (same tweet IDs, so it
+      // rarely adds recall — but halves typical request volume).
+      const xUrls = prefixes.map((prefix) => buildCdxUrl(lower, prefix, fromTs));
+      let settled = await fetchBuckets(xUrls);
+      let sent = xUrls.length;
+      let fin = finalize(settled);
+      if (fin.ranked.length === 0) {
+        // buildCdxUrl emits url=x.com%2F... (slashes encoded): swap the host.
+        const tUrls = xUrls.map((u) => u.replace('x.com%2F', 'twitter.com%2F'));
+        settled = await fetchBuckets(tUrls);
+        sent += tUrls.length;
+        fin = finalize(settled);
+      }
+      return { ranked: fin.ranked, truncated: fin.truncated, buckets: sent };
+    }
+
+    let run = await runFor(handle);
     const anyCaps = await handleHasAnyCaptures(handle, ua);
+    // Handle repair (SPEC §4.2): zero candidates → up to 6 cheap limit=1
+    // probes with confusable variants; full bucket re-fetch for the first
+    // variant that has captures. The UI flags the repair and the score is
+    // capped (handleOK=false).
+    let repairedHandle: string | undefined;
+    if (run.ranked.length === 0) {
+      const variants = repairCandidates(handle).filter(
+        (v) => v !== handle.toLowerCase() && /^[a-z0-9_]{1,15}$/.test(v),
+      );
+      for (const v of variants) {
+        if (await handleHasAnyCaptures(v, ua)) {
+          const retry = await runFor(v);
+          if (retry.ranked.length > 0) {
+            run = retry;
+            repairedHandle = v;
+            break;
+          }
+        }
+      }
+    }
     const result: CdxResult = {
-      candidates: ranked,
+      candidates: run.ranked,
       coverage: {
-        buckets: requests.length,
-        totalCaptures: ranked.length,
-        truncated,
-        handleHasAnyCaptures: anyCaps,
+        buckets: run.buckets,
+        totalCaptures: run.ranked.length,
+        truncated: run.truncated,
+        handleHasAnyCaptures: anyCaps || repairedHandle !== undefined,
+        ...(repairedHandle !== undefined ? { repairedHandle } : {}),
       },
       cached: false,
     };
     try {
-      await cache.set(key, result, cdxTtlSec(ranked.length === 0));
+      await cache.set(key, result, cdxTtlSec(run.ranked.length === 0));
     } catch {
       // ignore
     }

@@ -11,6 +11,7 @@ import PrivacyDisclosure from './components/PrivacyDisclosure';
 import ExamplePicker from './components/ExamplePicker';
 import ReceiptCard, { type ReceiptView } from './components/ReceiptCard';
 import { runCheckFlow, createReceipt, windowFromParsed } from './lib/check-client';
+import { runOcr, warmUpOcr } from './lib/ocr-run';
 import type { ParsedScreenshot, Verdict } from '../lib/types';
 
 function emptyParsed(): ParsedScreenshot {
@@ -49,6 +50,7 @@ export default function App() {
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [permalink, setPermalink] = useState<{ view: ReceiptView; url: string } | 'missing' | null>(null);
+  const [apiUp, setApiUp] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
 
@@ -73,19 +75,42 @@ export default function App() {
     };
   }, [routeId]);
 
-  // ---- File intake (OCR integration point: lib/ocr lands in Track A/B) ----
+  // ---- API health + OCR warm-up (on mount) ----
+  useEffect(() => {
+    warmUpOcr();
+    let cancelled = false;
+    fetch('/api/health')
+      .then((r) => {
+        if (!cancelled && !r.ok) setApiUp(false);
+      })
+      .catch(() => {
+        if (!cancelled) setApiUp(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---- File intake (on-device OCR via src/lib/ocr-run) ----
   function onFile(f: File): void {
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     setImageUrl(URL.createObjectURL(f));
     setVerdict(null);
     setReceipt(null);
+    setCheckError(null);
     setOcrStage('read');
-    // Local stand-in for on-device OCR: yield to the event loop, then hand
-    // control to the manual editor + examples. Real OCR plugs in here.
-    setTimeout(() => {
-      setParsed(emptyParsed());
-      setOcrStage(null);
-    }, 400);
+    runOcr(f, (_p, stage) => {
+      if (stage === 'recognize') setOcrStage('recognize');
+    })
+      .then((p) => {
+        setParsed(p);
+        setOcrStage(null);
+      })
+      .catch(() => {
+        setParsed(emptyParsed());
+        setCheckError("Couldn't read the screenshot automatically — fill in the fields and we'll re-check.");
+        setOcrStage(null);
+      });
   }
 
   // ---- Auto-start check, debounced 500ms, abort in-flight ----
@@ -196,6 +221,12 @@ export default function App() {
         Drop a screenshot of an X/Twitter post. Reading runs on-device; only the handle + date window leave the device.
       </p>
 
+      {!apiUp && (
+        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          API not reachable. Run pnpm dev:all (starts web + API).
+        </p>
+      )}
+
       <DropZone onFile={onFile} disabled={checking} />
 
       <div>
@@ -224,6 +255,10 @@ export default function App() {
           <p data-testid="coverage-line" className="text-sm opacity-70">
             Compared {verdict.coverage.capturesCompared} of {verdict.coverage.capturesFound} archived captures
             {verdict.coverage.truncated ? ' (truncated)' : ''}.
+            {verdict.coverage.repairedHandle && (
+              <> Handle read as “@{parsed?.handle.value ?? '?'}” had no captures, so we checked the look-alike
+              “@{verdict.coverage.repairedHandle}” instead — scored with a mismatch cap.</>
+            )}
           </p>
           {verdict.diff && <DiffView diff={verdict.diff} />}
           {verdict.best && <ArchivePreview archiveUrl={verdict.best.candidate.archiveUrl} originalUrl={verdict.best.candidate.originalUrl} />}

@@ -3,7 +3,13 @@ import { test, expect } from '@playwright/test';
 test('edit handle re-runs the check with the new handle', async ({ page }) => {
   const seenHandles: string[] = [];
   await page.route('**/api/wayback/search', async (route) => {
-    const body = (await route.request().postDataJSON().catch(() => null)) as { handle?: string } | null;
+    // postDataJSON() is synchronous in this Playwright version (throws on no/invalid body).
+    let body: { handle?: string } | null = null;
+    try {
+      body = route.request().postDataJSON() as { handle?: string } | null;
+    } catch {
+      body = null;
+    }
     if (body?.handle) seenHandles.push(body.handle);
     await route.fulfill({
       status: 200,
