@@ -27,6 +27,7 @@ export type ScreenshotParse = Omit<ParsedScreenshot, 'ocrMs' | 'fieldsEdited' | 
 };
 
 const HANDLE_RE = /[@©Q€]\s?([A-Za-z0-9_]{1,15})/;
+const HANDLE_GLOBAL_RE = new RegExp(HANDLE_RE.source, 'g');
 const HANDLE_VALID_RE = /^[A-Za-z0-9_]{1,15}$/;
 const PLATFORM_SIGNALS = [
   'views',
@@ -49,19 +50,59 @@ interface FoundHandle {
   bbox: BBox;
 }
 
+interface ScoredHandle extends FoundHandle {
+  wholeLine: boolean;
+}
+
+/**
+ * Scored handle selection (not first-match-wins). Avatar/logo OCR garbage
+ * (e.g. a "©"/"Q" misread yielding "@qe"-style 1–3 char tokens on an early
+ * line) must not beat the real @handle line. Rules:
+ * - scan EVERY match on EVERY line (a line can hold several @-mentions);
+ * - skip mid-word matches ("foo@bar.com", "a@b" inside a word) and matches
+ *   glued to a domain suffix (".com") — those are emails/URLs, not handles;
+ * - prefer whole-line "@handle" lines (X renders the handle alone);
+ * - then longer handles (garbage tokens are short);
+ * - then earlier lines / earlier matches.
+ */
 function findHandle(lines: OcrInputLine[]): FoundHandle | null {
+  const cands: ScoredHandle[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line === undefined) continue;
-    const m = HANDLE_RE.exec(line.text);
-    if (m === null) continue;
-    const cap = m[1];
-    if (cap === undefined) continue;
-    const lower = cap.toLowerCase();
-    if (!HANDLE_VALID_RE.test(lower)) continue;
-    return { value: lower, lineIndex: i, matchIndex: m.index, confidence: line.confidence, bbox: line.bbox };
+    const text = line.text;
+    HANDLE_GLOBAL_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = HANDLE_GLOBAL_RE.exec(text)) !== null) {
+      const cap = m[1];
+      if (cap === undefined) continue;
+      const before = text.slice(0, m.index);
+      const after = text.slice(m.index + m[0].length);
+      // Mid-word: the char before the @-sigil is a word char → email/word.
+      if (/[A-Za-z0-9_.]$/.test(before)) continue;
+      // Domain suffix: "@name.com" → email/URL, not a handle.
+      if (/^\.[A-Za-z]/.test(after)) continue;
+      const lower = cap.toLowerCase();
+      if (!HANDLE_VALID_RE.test(lower)) continue;
+      cands.push({
+        value: lower,
+        lineIndex: i,
+        matchIndex: m.index,
+        confidence: line.confidence,
+        bbox: line.bbox,
+        wholeLine: before.trim() === '' && after.trim() === '',
+      });
+    }
   }
-  return null;
+  if (cands.length === 0) return null;
+  cands.sort((a, b) => {
+    if (a.wholeLine !== b.wholeLine) return a.wholeLine ? -1 : 1;
+    if (a.value.length !== b.value.length) return b.value.length - a.value.length;
+    if (a.lineIndex !== b.lineIndex) return a.lineIndex - b.lineIndex;
+    return a.matchIndex - b.matchIndex;
+  });
+  const best = cands[0] as ScoredHandle;
+  return { value: best.value, lineIndex: best.lineIndex, matchIndex: best.matchIndex, confidence: best.confidence, bbox: best.bbox };
 }
 
 function mean(values: number[]): number {

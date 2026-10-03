@@ -33,6 +33,8 @@ export default function FieldEditor({ parsed, onChange, highlightMissing = false
   const missingHandle = highlightMissing && handle.trim() === '';
   const missingDate = highlightMissing && (parsed.dates.value ?? []).length === 0;
   const missingBody = highlightMissing && body.trim() === '';
+  const uncertainHandle =
+    !missingHandle && parsed.handle.source === 'ocr' && parsed.handle.confidence < 0.5;
   const inputClass = (missing: boolean): string =>
     `mt-1 w-full rounded border px-2 py-1${missing ? ' border-red-600' : ''}`;
 
@@ -88,6 +90,9 @@ export default function FieldEditor({ parsed, onChange, highlightMissing = false
           onChange={(e) => onHandle(e.target.value)}
         />
         {missingHandle && <span className="text-xs text-red-700">Enter the @handle shown in the screenshot.</span>}
+        {!missingHandle && uncertainHandle && (
+          <span className="text-xs text-amber-800">Handle looks uncertain — please verify it letter by letter.</span>
+        )}
       </label>
       <label className="mt-2 block text-sm">
         Post date

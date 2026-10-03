@@ -105,7 +105,20 @@ function headerBand(
   cropH: number,
 ): BBox | null {
   const head = lines.filter((l) => l.text.trim() !== '').slice(0, 3);
-  return bandUnion(head, cropW, cropH);
+  const band = bandUnion(head, cropW, cropH);
+  if (band === null) return null;
+  // Avatars sit in the left column and OCR as ©/Q-letter garbage that can
+  // out-score the real handle. Exclude the left 12% from the re-OCR band
+  // (the full pass still covers it — this only narrows the zoomed re-read).
+  const cut = cropW * 0.12;
+  if (band.x + band.w <= cut) return null;
+  if (band.x < cut) {
+    const shift = cut - band.x;
+    band.x = cut;
+    band.w = Math.max(0, band.w - shift);
+  }
+  if (band.w < 40) return null;
+  return band;
 }
 
 const DATE_HINT_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b|\d{1,2}[:/.-]\d|\b(am|pm)\b/i;
