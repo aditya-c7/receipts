@@ -5,6 +5,7 @@
 ![infra](https://img.shields.io/badge/infra-%240_Free_Tier-blueviolet)
 ![ocr](https://img.shields.io/badge/OCR-100%25_on--device-orange)
 ![privacy](https://img.shields.io/badge/screenshots-never_uploaded-yellowgreen)
+![ci](https://github.com/aditya-c7/receipts/actions/workflows/ci.yml/badge.svg)
 
 Drop in a screenshot of an X/Twitter post. In ~10 seconds you get
 **`Archived original found - 96% match`** (or an honest
