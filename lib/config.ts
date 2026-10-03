@@ -27,4 +27,5 @@ export const SNAP_TTL_DAYS = 180;
 // Rate limits (per hashed IP window)
 export const RL_SEARCH = { limit: 30, windowSec: 600 };
 export const RL_SNAPSHOT = { limit: 60, windowSec: 600 };
+export const RL_SYNDICATION = { limit: 60, windowSec: 600 };
 export const RL_RECEIPT = { limit: 5, windowSec: 3600 };

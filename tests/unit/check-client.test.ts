@@ -186,6 +186,100 @@ describe('runCheckFlow', () => {
   });
 });
 
+describe('live cross-check triangulation', () => {
+  const MIDDAY = Date.parse('2023-05-01T12:00:00Z');
+  function mocksFor(opts: { archiveText: string | null; live: unknown }) {
+    const c1 = candidateFor(MIDDAY, 'jack', '20230501120000');
+    const searchPayload = {
+      ok: true,
+      cached: false,
+      candidates: [c1],
+      coverage: { buckets: 2, totalCaptures: 1, truncated: false, handleHasAnyCaptures: true },
+    };
+    const fetchMock = vi.fn(async (url: unknown, init?: { body?: string }) => {
+      const u = String(url);
+      if (u.includes('/api/wayback/search')) return okJson(searchPayload);
+      if (u.includes('/api/wayback/snapshot')) {
+        return okJson({ ok: true, cached: false, archiveUrl: c1.archiveUrl, extracted: { text: opts.archiveText, extractor: 'og' } });
+      }
+      if (u.includes('/api/x/tweet')) {
+        const id = JSON.parse(String(init?.body ?? '{}')) as { id?: string };
+        expect(id.id).toBe(c1.tweetId);
+        return opts.live;
+      }
+      throw new Error(`unexpected fetch ${u}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return { c1, fetchMock };
+  }
+  function liveTweet(text: string, screenName = 'jack'): Response {
+    return okJson({ ok: true, cached: false, tweet: { status: 'live', id: 'x', text, screenName } });
+  }
+
+  it('archive MATCH + live agrees → verified archive+x', async () => {
+    mocksFor({ archiveText: CLAIMED, live: liveTweet(CLAIMED) });
+    const v = await runCheckFlow(makeParsed(CLAIMED, 'jack', [{ isoDate: '2023-05-01' }]));
+    expect(v.code).toBe('MATCH_STRONG');
+    expect(v.crossCheck?.verified).toBe(true);
+    expect(v.crossCheck?.verifiedBy).toBe('archive+x');
+    expect(v.crossCheck?.authorMatch).toBe(true);
+  });
+
+  it('archive unreadable + live verifies → upgraded MATCH_STRONG via x-live', async () => {
+    mocksFor({ archiveText: null, live: liveTweet(CLAIMED) });
+    const v = await runCheckFlow(makeParsed(CLAIMED, 'jack', [{ isoDate: '2023-05-01', minute: 720 }]));
+    expect(v.code).toBe('MATCH_STRONG');
+    expect(v.best?.archived.extractor).toBe('syndication');
+    expect(v.crossCheck?.verified).toBe(true);
+    expect(v.crossCheck?.verifiedBy).toBe('x-live');
+    expect(v.diff).toBeDefined();
+  });
+
+  it('live unavailable → archive verdict stands, crossCheck recorded', async () => {
+    const c1 = candidateFor(MIDDAY, 'jack', '20230501120000');
+    const searchPayload = {
+      ok: true,
+      cached: false,
+      candidates: [c1],
+      coverage: { buckets: 2, totalCaptures: 1, truncated: false, handleHasAnyCaptures: true },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        const u = String(url);
+        if (u.includes('/api/wayback/search')) return okJson(searchPayload);
+        if (u.includes('/api/wayback/snapshot')) {
+          return okJson({ ok: true, cached: false, archiveUrl: c1.archiveUrl, extracted: { text: null, extractor: 'none' } });
+        }
+        if (u.includes('/api/x/tweet')) {
+          // Route-level 200 carrying tweet-level unavailability (deleted tweet).
+          return okJson({ ok: true, cached: false, tweet: { status: 'unavailable', id: c1.tweetId, text: null, screenName: null } });
+        }
+        throw new Error(`unexpected fetch ${u}`);
+      }),
+    );
+    const v = await runCheckFlow(makeParsed(CLAIMED, 'jack', [{ isoDate: '2023-05-01', minute: 720 }]));
+    expect(v.code).toBe('POST_EXISTS_TEXT_UNREADABLE');
+    expect(v.crossCheck?.status).toBe('unavailable');
+    expect(v.crossCheck?.verified).toBe(false);
+  });
+
+  it('live disagrees (wrong author) → no upgrade, no badge', async () => {
+    mocksFor({ archiveText: null, live: liveTweet(CLAIMED, 'someoneelse') });
+    const v = await runCheckFlow(makeParsed(CLAIMED, 'jack', [{ isoDate: '2023-05-01', minute: 720 }]));
+    expect(v.code).toBe('POST_EXISTS_TEXT_UNREADABLE');
+    expect(v.crossCheck?.verified).toBe(false);
+    expect(v.crossCheck?.authorMatch).toBe(false);
+  });
+
+  it('garbage x/tweet shape → archive verdict untouched, no crash', async () => {
+    mocksFor({ archiveText: CLAIMED, live: okJson({ ok: true, candidates: [] }) });
+    const v = await runCheckFlow(makeParsed(CLAIMED, 'jack', [{ isoDate: '2023-05-01' }]));
+    expect(v.code).toBe('MATCH_STRONG');
+    expect(v.crossCheck).toBeUndefined();
+  });
+});
+
 describe('windowFromParsed', () => {
   it('known date → [00:00−14h, 23:59:59+12h] UTC', () => {
     const w = windowFromParsed(makeParsed(CLAIMED, 'jack', [{ isoDate: '2023-05-01' }]));

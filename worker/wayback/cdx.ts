@@ -207,6 +207,19 @@ export async function fetchCandidates(
       return { ranked: inWindow.slice(0, CDX_LIMIT), truncated };
     }
 
+    /**
+     * Readability score for one capture. twitter.com + pre-July-2023 captures
+     * are usually server-rendered (extractable text); post-2023 x.com captures
+     * are usually JS shells. Used only to pick the representative capture per
+     * tweet ID — never to drop IDs.
+     */
+    function readability(c: Candidate): number {
+      let s = 0;
+      if (c.originalUrl.includes('twitter.com')) s += 2;
+      if (c.snapshotTs < '20230701') s += 1;
+      return s;
+    }
+
     async function runFor(h: string): Promise<{ ranked: Candidate[]; truncated: boolean; buckets: number }> {
       const lower = h.toLowerCase();
       // Window -> Snowflake ID range -> <= SEARCH_MAX_BUCKETS decimal prefixes.
@@ -216,20 +229,35 @@ export async function fetchCandidates(
       const prefixes = idsToPrefixBuckets(minId, maxId, SEARCH_MAX_BUCKETS);
       // `from` is a CAPTURE-time lower bound only — never send `to=`: a
       // capture cannot predate the post but can postdate it by years.
-      // x.com first; twitter.com only as fall-through (same tweet IDs, so it
-      // rarely adds recall — but halves typical request volume).
+      // Query BOTH hosts (x.com buckets + twitter.com buckets): readability
+      // differs by host era, and per-ID selection below picks the best
+      // representative. Bucket fetches share one concurrency-3 pool.
       const xUrls = prefixes.map((prefix) => buildCdxUrl(lower, prefix, fromTs));
-      let settled = await fetchBuckets(xUrls);
-      let sent = xUrls.length;
-      let fin = finalize(settled);
-      if (fin.ranked.length === 0) {
-        // buildCdxUrl emits url=x.com%2F... (slashes encoded): swap the host.
-        const tUrls = xUrls.map((u) => u.replace('x.com%2F', 'twitter.com%2F'));
-        settled = await fetchBuckets(tUrls);
-        sent += tUrls.length;
-        fin = finalize(settled);
+      // buildCdxUrl emits url=x.com%2F... (slashes encoded): swap the host.
+      const tUrls = xUrls.map((u) => u.replace('x.com%2F', 'twitter.com%2F'));
+      const urls = [...xUrls, ...tUrls];
+      const settled = await fetchBuckets(urls);
+      // Per tweet ID keep the most readable status-200 capture (earliest on
+      // ties); if no 200 exists keep the most readable overall.
+      const byId = new Map<string, Candidate[]>();
+      for (const c of settled.flat()) {
+        const list = byId.get(c.tweetId);
+        if (list) list.push(c);
+        else byId.set(c.tweetId, [c]);
       }
-      return { ranked: fin.ranked, truncated: fin.truncated, buckets: sent };
+      const picked: Candidate[] = [];
+      for (const list of byId.values()) {
+        const good = list.filter((c) => c.statusCode === 200);
+        const pool = good.length > 0 ? good : list;
+        pool.sort(
+          (a, b) =>
+            readability(b) - readability(a) || (a.snapshotTs < b.snapshotTs ? -1 : a.snapshotTs > b.snapshotTs ? 1 : 0),
+        );
+        const first = pool[0];
+        if (first) picked.push(first);
+      }
+      const fin = finalize([picked]);
+      return { ranked: fin.ranked, truncated: fin.truncated, buckets: urls.length };
     }
 
     let run = await runFor(handle);

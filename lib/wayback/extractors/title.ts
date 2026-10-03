@@ -7,7 +7,16 @@ export interface TitleResult {
   displayName?: string;
 }
 
-const GENERIC = new Set(['x', 'twitter', 'x / home', 'twitter / home', 'log in on x', 'login on x']);
+const GENERIC = new Set([
+  'x',
+  'x.com',
+  'twitter',
+  'twitter.com',
+  'x / home',
+  'twitter / home',
+  'log in on x',
+  'login on x',
+]);
 
 export function extractTitle($: CheerioAPI): TitleResult | null {
   const raw = $('title').first().text();

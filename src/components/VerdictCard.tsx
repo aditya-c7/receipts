@@ -38,7 +38,15 @@ export default function VerdictCard({ verdict }: VerdictCardProps) {
             />
           </svg>
           <div className="space-y-1">
-            <Badge variant={tierVariant(verdict.code)}>{verdict.code.replace(/_/g, ' ')}</Badge>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant={tierVariant(verdict.code)}>{verdict.code.replace(/_/g, ' ')}</Badge>
+              {verdict.crossCheck?.verified === true && verdict.crossCheck.verifiedBy === 'archive+x' && (
+                <Badge data-testid="verified-badge" variant="default">Verified against X + archive</Badge>
+              )}
+              {verdict.crossCheck?.verified === true && verdict.crossCheck.verifiedBy === 'x-live' && (
+                <Badge data-testid="verified-badge" variant="default">Verified against the live post on X</Badge>
+              )}
+            </div>
             <CardTitle data-testid="verdict-title" className="text-lg">
               {copy.title(verdict.score)}
             </CardTitle>

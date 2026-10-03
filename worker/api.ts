@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { toErrorJson, AppError } from '../lib/errors';
+import type { ArchivedPost } from '../lib/types';
 import { log } from '../lib/log';
 import { scorePair } from '../lib/match/score';
 import { decide } from '../lib/verdict/engine';
@@ -20,6 +21,7 @@ import { checkRateLimit } from './ratelimit/upstash';
 import { getReceipt, saveReceipt, type D1Database } from './db/receipts';
 import { fetchCandidates } from './wayback/cdx';
 import { fetchSnapshot } from './wayback/snapshot';
+import { fetchSyndicatedTweet } from './x/syndication';
 
 type Bindings = {
   RECEIPTS_DB?: D1Database;
@@ -108,6 +110,33 @@ app.post('/api/wayback/snapshot', async (c) => {
   }
 });
 
+const tweetSchema = z.object({
+  id: z.string().regex(/^\d{1,25}$/),
+});
+
+// Authoritative live-tweet cross-check (X syndication endpoint, keyless).
+// Privacy: only the already-public tweet ID arrives here — no screenshot,
+// no OCR text. Unofficial upstream: clients must always keep the archive
+// fallback (feature-flagged client-side).
+app.post('/api/x/tweet', async (c) => {
+  try {
+    const body = tweetSchema.parse(await c.req.json());
+    const rl = await checkRateLimit(c.env, 'syndication', clientIp(c));
+    if (!rl.ok) {
+      return c.json(
+        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many live checks — try again shortly.', retryAfterMs: rl.retryAfterMs } },
+        429,
+      );
+    }
+    log('x.syndication', { idLen: body.id.length });
+    const tweet = await fetchSyndicatedTweet(body.id, c.env);
+    return c.json({ ok: true, cached: tweet.cached, tweet });
+  } catch (e) {
+    if (e instanceof z.ZodError) return c.json(toErrorJson(new AppError('BAD_INPUT', 'Invalid tweet id')), 400);
+    return c.json(toErrorJson(e), 500);
+  }
+});
+
 const receiptSchema = z.object({
   platform: z.literal('x'),
   handle: z.string().regex(/^[A-Za-z0-9_]{1,15}$/),
@@ -138,7 +167,7 @@ app.post('/api/receipt', async (c) => {
     // Server recompute (anti-forgery): re-fetch from cache/network with the
     // SAME shared libs as the client, never trust the client score.
     const cache = makeCache(c.env);
-    let snapExtracted: { text: string | null; extractor: 'ldjson' | 'og' | 'classic' | 'embeddedJson' | 'title' | 'none' } | null = null;
+    let snapExtracted: ArchivedPost | null = null;
     try {
       const snap = await fetchSnapshot(body.snapshotTs, body.originalUrl, c.env, cache);
       snapExtracted = snap.extracted;

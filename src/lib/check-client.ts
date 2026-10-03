@@ -1,9 +1,9 @@
 // Client check flow (privacy-preserving).
 //
-// Sends ONLY {platform,handle,window} to /api/wayback/search and
-// {snapshotTs,originalUrl} to /api/wayback/snapshot. Screenshot bytes and
-// OCR body text NEVER leave the device except via explicit
-// createReceipt(body) -> POST /api/receipt.
+// Sends ONLY {platform,handle,window} to /api/wayback/search,
+// {snapshotTs,originalUrl} to /api/wayback/snapshot, and the public tweet ID
+// to /api/x/tweet. Screenshot bytes and OCR body text NEVER leave the device
+// except via explicit createReceipt(body) -> POST /api/receipt.
 //
 // Scoring uses the SAME shared libs as the server receipt path:
 // lib/match (similarity/score/diff), lib/verdict (decide), lib/wayback
@@ -11,6 +11,8 @@
 import {
   EARLY_EXIT_SCORE,
   MAX_SNAPSHOTS_PER_CHECK,
+  SCORE_LIKELY,
+  SCORE_STRONG,
   VERIFY_CONCURRENCY,
   VERIFY_TIME_BUDGET_MS,
 } from '../../lib/config';
@@ -23,7 +25,7 @@ import {
   checkTimeConsistent,
   rankByTimeConsistency,
 } from '../../lib/wayback/timeConsistency';
-import type { ArchivedPost, Candidate, ParsedScreenshot, Verdict, VerdictCode } from '../../lib/types';
+import type { ArchivedPost, Candidate, CrossCheck, ParsedScreenshot, Verdict, VerdictCode } from '../../lib/types';
 
 export interface CheckCallbacks {
   onStage?: (stage: string) => void;
@@ -236,8 +238,9 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
   };
   if (!best) {
     // Snapshots all failed but candidates exist: searched, found pointers,
-    // could not compare text.
-    return decide({
+    // could not compare text. The live cross-check can still verify.
+    const first = ranked[0];
+    const base: Verdict = decide({
       platform: 'x',
       handleOk: handleOK,
       dateOk: null,
@@ -247,9 +250,19 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
       coverage,
       archiveError: false,
     });
+    if (!first) return base;
+    return withCrossCheck(base, {
+      candidate: first,
+      claimedText,
+      handle,
+      dateIso: dateIso as string,
+      claimedMinute,
+      handleOK,
+      signal,
+    });
   }
   const extractable = (best.archived.text ?? '').trim() !== '';
-  return decide({
+  const base: Verdict = decide({
     platform: 'x',
     handleOk: handleOK,
     dateOk: best.dateOK,
@@ -267,6 +280,160 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
     archiveError: false,
     diff: best.archived.text ? wordDiff(claimedText, best.archived.text) : undefined,
   });
+  return withCrossCheck(base, {
+    candidate: best.candidate,
+    claimedText,
+    handle,
+    dateIso: dateIso as string,
+    claimedMinute,
+    handleOK,
+    signal,
+  });
+}
+
+interface CrossCheckCtx {
+  candidate: Candidate;
+  claimedText: string;
+  handle: string;
+  dateIso: string;
+  claimedMinute: number | undefined;
+  handleOK: boolean;
+  signal?: AbortSignal;
+}
+
+// NOTE: the /api/x/tweet contract is { ok, cached, tweet: { status, id,
+// text, screenName, ... } }, but runtime parsing below is shape-hardened
+// inline (mocks/proxies/upstream changes must never crash the check), so no
+// static response type is asserted here.
+
+/**
+ * Authoritative live-post cross-check (Part 2/4 of the accuracy upgrade).
+ * Asks /api/x/tweet for the best candidate's PUBLIC tweet ID only, then:
+ * - archive MATCH + live agrees (same author, text sim >= 0.75) →
+ *   crossCheck.verifiedBy = 'archive+x' ("Verified against X + archive");
+ * - archive unreadable/failed + live verifies (same author, sim >= 0.90) →
+ *   upgrades to MATCH_STRONG (0.75–0.89 → MATCH_LIKELY) with the live text
+ *   as evidence ('x-live'). Never downgrades an archive match.
+ * Returns the input verdict unchanged on any failure/timeout (archive path
+ * always stands alone; the endpoint is unofficial).
+ */
+async function withCrossCheck(base: Verdict, ctx: CrossCheckCtx): Promise<Verdict> {
+  const { candidate, claimedText, handle, dateIso, claimedMinute, handleOK } = ctx;
+  let api: { tweet?: unknown } | null = null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    try {
+      const res = await fetch('/api/x/tweet', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: candidate.tweetId }),
+        signal: ctx.signal?.aborted ? ctx.signal : ctrl.signal,
+      });
+      if (res.ok) api = (await res.json()) as { tweet?: unknown };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return base;
+  }
+  // Shape-hardened: mocks, proxies, or upstream changes must never crash the
+  // check or attach a half-parsed cross-check. Unknown shape = no evidence.
+  if (api === null) return base;
+  const tw = api.tweet;
+  if (tw === null || typeof tw !== 'object') return base;
+  const t = tw as { status?: unknown; text?: unknown; screenName?: unknown };
+  const screenName = typeof t.screenName === 'string' ? t.screenName : null;
+  if (t.status !== 'live' || typeof t.text !== 'string' || t.text.trim() === '') {
+    const cc: CrossCheck = {
+      tweetId: candidate.tweetId,
+      originalUrl: candidate.originalUrl,
+      status: 'unavailable',
+      screenName,
+      liveTextSim: null,
+      authorMatch: null,
+      verified: false,
+      verifiedBy: null,
+    };
+    return { ...base, crossCheck: cc };
+  }
+  const liveText: string = t.text;
+  const authorMatch = (screenName ?? '').toLowerCase() === handle;
+  const liveSim = textSimilarity(claimedText, liveText).score;
+  const dateOK = checkDateConsistent(dateIso, candidate.idTimeMs);
+  const tc = checkTimeConsistent(dateIso, claimedMinute, candidate.idTimeMs);
+  const liveArchived: ArchivedPost = {
+    text: liveText,
+    handle: screenName ?? undefined,
+    extractor: 'syndication',
+  };
+  const strong = authorMatch && liveSim >= SCORE_STRONG;
+  const likely = authorMatch && liveSim >= SCORE_LIKELY;
+  const archiveMatched = base.code === 'MATCH_STRONG' || base.code === 'MATCH_LIKELY';
+
+  if (archiveMatched && likely) {
+    // Both independent sources agree.
+    const cc: CrossCheck = {
+      tweetId: candidate.tweetId,
+      originalUrl: candidate.originalUrl,
+      status: 'live',
+      screenName,
+      liveTextSim: liveSim,
+      authorMatch,
+      verified: true,
+      verifiedBy: 'archive+x',
+    };
+    return { ...base, crossCheck: cc };
+  }
+  if (!archiveMatched && (strong || likely) && handleOK) {
+    // Archive text unreadable (or snapshots failed) but the live post
+    // verifies author + text: upgrade with live evidence.
+    const gated = scorePair(claimedText, liveText, {
+      handleOK: true,
+      dateOK: dateOK === true,
+      timeConsistent: tc,
+    });
+    const upgraded = decide({
+      platform: 'x',
+      handleOk: true,
+      dateOk: dateOK,
+      hasDates: true,
+      best: {
+        score: gated.score,
+        textSim: gated.textSim,
+        timeConsistent: tc,
+        extractable: true,
+        candidate,
+        archived: liveArchived,
+      },
+      alternates: base.alternates,
+      coverage: base.coverage,
+      archiveError: false,
+      diff: wordDiff(claimedText, liveText),
+    });
+    const cc: CrossCheck = {
+      tweetId: candidate.tweetId,
+      originalUrl: candidate.originalUrl,
+      status: 'live',
+      screenName,
+      liveTextSim: liveSim,
+      authorMatch,
+      verified: true,
+      verifiedBy: 'x-live',
+    };
+    return { ...upgraded, crossCheck: cc };
+  }
+  const cc: CrossCheck = {
+    tweetId: candidate.tweetId,
+    originalUrl: candidate.originalUrl,
+    status: 'live',
+    screenName,
+    liveTextSim: liveSim,
+    authorMatch,
+    verified: false,
+    verifiedBy: null,
+  };
+  return { ...base, crossCheck: cc };
 }
 
 /** Explicit opt-in only: uploads OCR/body text to create a shareable receipt. */

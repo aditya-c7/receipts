@@ -20,7 +20,7 @@ export const VERDICT_COPY: Record<string, { title: (score: number | null) => str
   },
   NO_MATCH: {
     title: () => 'No archive match found. That does not mean it is not real.',
-    body: 'Most posts are never archived, and accounts get renamed or deleted. Here’s what to check next.',
+    body: 'Most posts are never archived, and accounts get renamed or deleted.',
   },
   INSUFFICIENT_INPUT: {
     title: () => 'We couldn’t read enough to search.',

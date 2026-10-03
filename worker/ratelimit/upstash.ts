@@ -2,10 +2,10 @@
 // Never logs raw IPs — only truncated hashes. Never throws.
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
-import { RL_RECEIPT, RL_SEARCH, RL_SNAPSHOT } from '../../lib/config';
+import { RL_RECEIPT, RL_SEARCH, RL_SNAPSHOT, RL_SYNDICATION } from '../../lib/config';
 import { log } from '../../lib/log';
 
-export type RateKind = 'search' | 'snapshot' | 'receipt';
+export type RateKind = 'search' | 'snapshot' | 'receipt' | 'syndication';
 
 export interface RateEnv {
   UPSTASH_REDIS_REST_URL?: string;
@@ -30,6 +30,7 @@ export async function hashIp(ip: string, salt: string): Promise<string> {
 function limitFor(kind: RateKind): { limit: number; windowSec: number } {
   if (kind === 'search') return RL_SEARCH;
   if (kind === 'snapshot') return RL_SNAPSHOT;
+  if (kind === 'syndication') return RL_SYNDICATION;
   return RL_RECEIPT;
 }
 

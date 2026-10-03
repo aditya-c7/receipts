@@ -48,7 +48,24 @@ export interface ArchivedPost {
   displayName?: string;
   handle?: string;
   createdAtIso?: string;
-  extractor: 'ldjson' | 'og' | 'classic' | 'embeddedJson' | 'title' | 'none';
+  extractor: 'ldjson' | 'og' | 'classic' | 'embeddedJson' | 'title' | 'syndication' | 'none';
+}
+
+/**
+ * Authoritative live-post cross-check (X syndication endpoint, keyless).
+ * Only the public tweet ID is sent; screenshot/OCR text never leave.
+ * `verifiedBy` is 'archive+x' when archive scoring AND the live post agree,
+ * 'x-live' when the archive text was unreadable but the live post verifies.
+ */
+export interface CrossCheck {
+  tweetId: string;
+  originalUrl: string;
+  status: 'live' | 'unavailable';
+  screenName: string | null;
+  liveTextSim: number | null;
+  authorMatch: boolean | null;
+  verified: boolean;
+  verifiedBy: 'archive+x' | 'x-live' | null;
 }
 
 export type VerdictCode =
@@ -72,6 +89,7 @@ export interface Verdict {
   };
   best?: { candidate: Candidate; archived: ArchivedPost };
   alternates: Array<{ candidate: Candidate; textSim: number }>;
+  crossCheck?: CrossCheck;
   coverage: {
     capturesFound: number;
     capturesCompared: number;

@@ -16,7 +16,56 @@ function clean(s: string): string | null {
     const stripped = t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     return stripped === '' ? null : stripped;
   }
+  if (isJunkArchiveText(t)) return null;
   return t;
+}
+
+/**
+ * Text-quality gate: archive captures of JS-rendered X pages often yield page
+ * chrome ("x.com", login walls, error pages) instead of post text. Scoring
+ * such junk produces meaningless similarities (e.g. a "37%" that flips a
+ * verdict), so it is rejected here and surfaces as text-unreadable.
+ */
+export function isJunkArchiveText(t: string): boolean {
+  const n = t
+    .toLowerCase()
+    .replace(/[“”"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (n === '') return true;
+  const GENERIC = new Set([
+    'x',
+    'x.com',
+    'twitter',
+    'twitter.com',
+    'home',
+    'login',
+    'join x',
+    'sign in',
+    'x / home',
+    'log in',
+    'log in on x',
+    'login on x',
+    'sign up',
+  ]);
+  if (GENERIC.has(n)) return true;
+  // Below 10 chars even a perfect read caps at PARTIAL (length guard) while
+  // junk risk is highest — treat as unreadable rather than scoring noise.
+  if (n.length < 10) return true;
+  const JUNK_HINTS = [
+    'something went wrong',
+    'rate limit exceeded',
+    'too many requests',
+    'javascript is not available',
+    'enable javascript',
+    'log in to',
+    'sign up to',
+    'this post was deleted',
+    'post not found',
+    'page not found',
+    'content is not available',
+  ];
+  return JUNK_HINTS.some((h) => n.includes(h));
 }
 
 /**
