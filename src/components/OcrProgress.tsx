@@ -1,3 +1,6 @@
+import { Badge } from './ui/badge';
+import { Progress } from './ui/progress';
+
 const STAGES = ['upload', 'read', 'search', 'snapshots', 'verdict'] as const;
 
 interface OcrProgressProps {
@@ -7,20 +10,19 @@ interface OcrProgressProps {
 
 export default function OcrProgress({ stage, detail }: OcrProgressProps) {
   const idx = STAGES.indexOf(stage as (typeof STAGES)[number]);
+  const m = detail !== undefined ? /Compared (\d+) of (\d+)/.exec(detail) : null;
+  const frac = m !== null && Number(m[2]) > 0 ? Math.min(1, Number(m[1]) / Number(m[2])) : null;
   return (
-    <div data-testid="ocr-progress" aria-live="polite" className="rounded border p-3 text-sm">
-      <ol className="flex flex-wrap gap-2">
+    <div data-testid="ocr-progress" aria-live="polite" className="space-y-2">
+      <ol className="flex flex-wrap gap-1.5">
         {STAGES.map((s, i) => (
-          <li
-            key={s}
-            aria-current={s === stage ? 'step' : undefined}
-            className={`rounded px-2 py-1 ${i <= idx ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-100 dark:bg-gray-800'}`}
-          >
-            {s}
+          <li key={s} aria-current={s === stage ? 'step' : undefined}>
+            <Badge variant={i < idx ? 'default' : i === idx ? 'secondary' : 'outline'}>{s}</Badge>
           </li>
         ))}
       </ol>
-      {detail && <p className="mt-2 opacity-70">{detail}</p>}
+      {frac !== null && <Progress value={Math.round(frac * 100)} aria-label={detail} />}
+      {detail && frac === null && <p className="text-muted-foreground text-sm">{detail}</p>}
     </div>
   );
 }

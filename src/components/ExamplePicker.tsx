@@ -1,4 +1,5 @@
 import type { ParsedScreenshot } from '../../lib/types';
+import { Button } from './ui/button';
 import archived1 from '../examples/archived-1.json';
 import archived2 from '../examples/archived-2.json';
 import archived3 from '../examples/archived-3.json';
@@ -42,14 +43,9 @@ export default function ExamplePicker({ onPick }: ExamplePickerProps) {
   return (
     <div data-testid="example-picker" className="flex flex-wrap gap-2">
       {items.map((it) => (
-        <button
-          key={it.label}
-          type="button"
-          className="rounded border px-3 py-1 text-sm underline"
-          onClick={() => onPick(coerce(it.data))}
-        >
+        <Button key={it.label} type="button" variant="outline" size="sm" onClick={() => onPick(coerce(it.data))}>
           {it.label}
-        </button>
+        </Button>
       ))}
     </div>
   );

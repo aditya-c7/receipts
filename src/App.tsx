@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ReceiptText, TriangleAlert, WifiOff } from 'lucide-react';
 import DropZone from './components/DropZone';
 import OcrProgress from './components/OcrProgress';
 import ScreenshotOverlay from './components/ScreenshotOverlay';
@@ -6,10 +7,24 @@ import FieldEditor from './components/FieldEditor';
 import VerdictCard from './components/VerdictCard';
 import DiffView from './components/DiffView';
 import ArchivePreview from './components/ArchivePreview';
-import NextSteps from './components/NextSteps';
 import PrivacyDisclosure from './components/PrivacyDisclosure';
 import ExamplePicker from './components/ExamplePicker';
 import ReceiptCard, { type ReceiptView } from './components/ReceiptCard';
+import { Button } from './components/ui/button';
+import { Checkbox } from './components/ui/checkbox';
+import { Label } from './components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
+import { Skeleton } from './components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './components/ui/dialog';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './components/ui/accordion';
+import { Card, CardContent } from './components/ui/card';
 import { runCheckFlow, createReceipt, windowFromParsed } from './lib/check-client';
 import { runOcr, warmUpOcr } from './lib/ocr-run';
 import type { ParsedScreenshot, Verdict } from '../lib/types';
@@ -198,13 +213,18 @@ export default function App() {
 
   if (routeId) {
     return (
-      <main className="mx-auto max-w-2xl p-6">
+      <main className="bg-background text-foreground min-h-screen">
+        <div className="mx-auto max-w-2xl space-y-5 px-4 py-8">
         <h1 className="text-2xl font-bold">Receipts — shared receipt</h1>
         {permalink === null && <p className="mt-4 text-sm">Loading receipt…</p>}
         {permalink === 'missing' && <p className="mt-4 text-sm">Receipt not found. It may have been removed.</p>}
         {permalink !== null && permalink !== 'missing' && <div className="mt-4"><ReceiptCard receipt={permalink.view} url={permalink.url} /></div>}
         <p className="mt-4 text-sm"><a href="/" className="underline">Check another screenshot</a></p>
-        <Footers />
+        <SiteFooter
+          searchPayload={{ platform: 'x', handle: '<handle>', window: { fromMs: 0, toMs: 0 } }}
+          snapshotPayload={{ snapshotTs: '<14-digit ts>', originalUrl: 'https://x.com/<handle>/status/<id>' }}
+        />
+        </div>
       </main>
     );
   }
@@ -219,29 +239,45 @@ export default function App() {
   );
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-2xl font-bold">Receipts — Did they really post that?</h1>
-      <p className="text-sm opacity-80">
-        Drop a screenshot of an X/Twitter post. Reading runs on-device; only the handle + date window leave the device.
-      </p>
+    <main className="bg-background text-foreground min-h-screen">
+      <div className="mx-auto max-w-2xl space-y-5 px-4 py-8">
+      <header className="flex items-center gap-3">
+        <div aria-hidden className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl shadow-xs">
+          <ReceiptText className="size-5" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold leading-tight">Receipts — Did they really post that?</h1>
+          <p className="text-muted-foreground text-sm">
+            Drop a screenshot of an X/Twitter post. Reading runs on-device; only the handle + date window leave the device.
+          </p>
+        </div>
+      </header>
 
       {!apiUp && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          API not reachable. Run pnpm dev:all (starts web + API).
-        </p>
+        <Alert variant="destructive">
+          <WifiOff />
+          <AlertTitle>API not reachable</AlertTitle>
+          <AlertDescription>Run pnpm dev:all (starts web + API).</AlertDescription>
+        </Alert>
       )}
 
-      <DropZone onFile={onFile} disabled={checking} />
+      <Card>
+        <CardContent className="space-y-4 pt-4">
+      <section aria-label="Upload">
+        <DropZone onFile={onFile} disabled={checking} />
 
-      <div>
-        <h2 className="mb-2 text-sm font-bold">No screenshot? Try an example</h2>
-        <ExamplePicker
-          onPick={(p) => {
-            setParsed(p);
-            setReceipt(null);
-          }}
-        />
-      </div>
+        <div className="mt-4">
+          <h2 className="mb-2 text-sm font-semibold">No screenshot? Try an example</h2>
+          <ExamplePicker
+            onPick={(p) => {
+              setParsed(p);
+              setReceipt(null);
+            }}
+          />
+        </div>
+      </section>
+        </CardContent>
+      </Card>
 
       {ocrStage && <OcrProgress stage={ocrStage} detail={checking && progress ? `Compared ${progress.compared} of ${progress.total}` : undefined} />}
 
@@ -253,14 +289,22 @@ export default function App() {
         <FieldEditor parsed={parsed} onChange={setParsed} highlightMissing={verdict?.code === 'INSUFFICIENT_INPUT'} />
       )}
 
-      {checkError && <p role="alert" className="text-sm text-red-700">{checkError}</p>}
+      {checkError && (
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertDescription>{checkError}</AlertDescription>
+        </Alert>
+      )}
 
       {checking && !verdict && parsed && !routeId && (
-        <p role="status" className="text-sm opacity-70">Re-checking archives…</p>
+        <div className="space-y-2" role="status" aria-label="Re-checking archives">
+          <Skeleton className="h-24 w-full" />
+          <p className="text-muted-foreground text-sm">Re-checking archives…</p>
+        </div>
       )}
 
       {verdict && (
-        <>
+        <section aria-label="Result" className="space-y-3">
           <VerdictCard verdict={verdict} />
           <p data-testid="coverage-line" className="text-sm opacity-70">
             Compared {verdict.coverage.capturesCompared} of {verdict.coverage.capturesFound} archived captures
@@ -272,15 +316,13 @@ export default function App() {
           </p>
           {verdict.diff && <DiffView diff={verdict.diff} />}
           {verdict.best && <ArchivePreview archiveUrl={verdict.best.candidate.archiveUrl} originalUrl={verdict.best.candidate.originalUrl} />}
-          <NextSteps />
-        </>
+        </section>
       )}
 
       {verdict?.best && !receipt && (
-        <button
+        <Button
           data-testid="create-receipt-open"
           type="button"
-          className="rounded bg-black px-4 py-2 text-sm text-white dark:bg-white dark:text-black"
           onClick={() => {
             setConsentUpload(false);
             setConsentStore(false);
@@ -289,99 +331,124 @@ export default function App() {
           }}
         >
           Create receipt
-        </button>
+        </Button>
       )}
 
-      {dialogOpen && (
-        <div data-testid="receipt-dialog" role="dialog" aria-label="Create a shareable receipt" className="rounded border p-4">
-          <h3 className="font-bold">Create a shareable receipt?</h3>
-          <p className="mt-1 text-sm opacity-70">
-            This uploads the post text you confirmed above so anyone with the link can re-verify it.
-          </p>
-          <label className="mt-2 flex items-start gap-2 text-sm">
-            <input data-testid="consent-upload" type="checkbox" checked={consentUpload} onChange={(e) => setConsentUpload(e.target.checked)} />
-            I understand my confirmed post text will be uploaded.
-          </label>
-          <label className="mt-2 flex items-start gap-2 text-sm">
-            <input data-testid="consent-store" type="checkbox" checked={consentStore} onChange={(e) => setConsentStore(e.target.checked)} />
-            I consent to storing this receipt so the link keeps working.
-          </label>
-          {receiptError && <p role="alert" className="mt-2 text-sm text-red-700">{receiptError}</p>}
-          <div className="mt-3 flex gap-2">
-            <button
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent data-testid="receipt-dialog" aria-label="Create a shareable receipt">
+          <DialogHeader>
+            <DialogTitle>Create a shareable receipt?</DialogTitle>
+            <DialogDescription>
+              This uploads the post text you confirmed above so anyone with the link can re-verify it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Label className="cursor-pointer items-start gap-2 font-normal">
+              <Checkbox
+                data-testid="consent-upload"
+                checked={consentUpload}
+                onCheckedChange={(v) => setConsentUpload(v === true)}
+              />
+              <span className="text-sm">I understand my confirmed post text will be uploaded.</span>
+            </Label>
+            <Label className="cursor-pointer items-start gap-2 font-normal">
+              <Checkbox
+                data-testid="consent-store"
+                checked={consentStore}
+                onCheckedChange={(v) => setConsentStore(v === true)}
+              />
+              <span className="text-sm">I consent to storing this receipt so the link keeps working.</span>
+            </Label>
+            {receiptError && (
+              <Alert variant="destructive">
+                <TriangleAlert />
+                <AlertDescription>{receiptError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
               data-testid="create-receipt-confirm"
               type="button"
               disabled={!consentUpload || !consentStore || receiptLoading}
-              className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-black"
               onClick={onCreateReceipt}
             >
               {receiptLoading ? 'Creating…' : 'Create receipt'}
-            </button>
-            <button type="button" className="rounded border px-4 py-2 text-sm" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {receipt && (
         <>
           <ReceiptCard receipt={receipt.view} url={receipt.url} />
-          <p className="text-sm"><a data-testid="receipt-link" href={new URL(receipt.url).pathname} className="underline">Open permalink</a></p>
+          <Button asChild variant="link" className="h-auto p-0 text-sm">
+            <a data-testid="receipt-link" href={new URL(receipt.url).pathname}>Open permalink</a>
+          </Button>
         </>
       )}
 
-      <PrivacyDisclosure
+      <SiteFooter
         searchPayload={lastSearchPayload ?? { platform: 'x', handle: '<handle>', window: { fromMs: 0, toMs: 0 } }}
         snapshotPayload={lastSnapshotPayload ?? { snapshotTs: '<14-digit ts>', originalUrl: 'https://x.com/<handle>/status/<id>' }}
       />
-
-      <Footers />
+      </div>
     </main>
   );
 }
 
-function Footers() {
+function SiteFooter({ searchPayload, snapshotPayload }: { searchPayload: unknown; snapshotPayload: unknown }) {
   return (
-    <footer className="space-y-6 pt-6 text-sm">
-      <section aria-label="Privacy">
-        <h3 className="font-bold">Privacy — what leaves your device</h3>
-        <table className="mt-2 w-full border text-left text-xs">
-          <thead>
-            <tr className="border-b">
-              <th className="p-2">Data</th>
-              <th className="p-2">Leaves device?</th>
-              <th className="p-2">When</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b"><td className="p-2">Screenshot pixels</td><td className="p-2">Never</td><td className="p-2">—</td></tr>
-            <tr className="border-b"><td className="p-2">Handle + date window</td><td className="p-2">Yes</td><td className="p-2">Every check (search request)</td></tr>
-            <tr className="border-b"><td className="p-2">Snapshot pointer (ts + URL)</td><td className="p-2">Yes</td><td className="p-2">Every check (snapshot request)</td></tr>
-            <tr className="border-b"><td className="p-2">Post text (OCR)</td><td className="p-2">Only with consent</td><td className="p-2">Create receipt dialog</td></tr>
-            <tr><td className="p-2">IP address</td><td className="p-2">Hashed daily</td><td className="p-2">Rate limiting only; raw IPs never logged</td></tr>
-          </tbody>
-        </table>
-      </section>
-      <section aria-label="How it works">
-        <h3 className="font-bold">How it works</h3>
-        <p className="mt-1 text-xs opacity-80">
-          Every post has an ID number that encodes its creation time. We decode that time and keep captures close to
-          the claimed date first (time-consistency ranking). Scores are text similarity (0–100) — not a probability,
-          and not a ruling on the screenshot. A receipt proves quoted text existed in a specific archived capture, not
-          that a screenshot is untouched. Missing archives prove nothing: most posts are never captured.
-        </p>
-      </section>
-      <section aria-label="About and takedown">
-        <h3 className="font-bold">About · takedown</h3>
-        <p className="mt-1 text-xs opacity-80">
-          Contact: adityachitragar2.0@gmail.com. To request removal of a receipt you created, include the receipt link
-          (/r/…) and we will remove it.
-        </p>
-      </section>
-      <p className="text-xs opacity-60">
+    <footer className="pt-2 text-sm">
+      <Accordion type="single" collapsible className="bg-card text-card-foreground rounded-xl border px-4 shadow-xs">
+        <AccordionItem value="details">
+          <AccordionTrigger>Privacy &amp; details</AccordionTrigger>
+          <AccordionContent className="space-y-4">
+            <PrivacyDisclosure searchPayload={searchPayload} snapshotPayload={snapshotPayload} />
+            <section aria-label="Privacy">
+              <h3 className="font-semibold">Privacy — what leaves your device</h3>
+              <table className="mt-2 w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="p-2">Data</th>
+                    <th className="p-2">Leaves device?</th>
+                    <th className="p-2">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b"><td className="p-2">Screenshot pixels</td><td className="p-2">Never</td><td className="p-2">—</td></tr>
+                  <tr className="border-b"><td className="p-2">Handle + date window</td><td className="p-2">Yes</td><td className="p-2">Every check (search request)</td></tr>
+                  <tr className="border-b"><td className="p-2">Snapshot pointer (ts + URL)</td><td className="p-2">Yes</td><td className="p-2">Every check (snapshot request)</td></tr>
+                  <tr className="border-b"><td className="p-2">Post text (OCR)</td><td className="p-2">Only with consent</td><td className="p-2">Create receipt dialog</td></tr>
+                  <tr><td className="p-2">IP address</td><td className="p-2">Hashed daily</td><td className="p-2">Rate limiting only; raw IPs never logged</td></tr>
+                </tbody>
+              </table>
+            </section>
+            <section aria-label="How it works">
+              <h3 className="font-semibold">How it works</h3>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Every post has an ID number that encodes its creation time. We decode that time and keep captures close to
+                the claimed date first (time-consistency ranking). Scores are text similarity (0–100) — not a probability,
+                and not a ruling on the screenshot. A receipt proves quoted text existed in a specific archived capture, not
+                that a screenshot is untouched. Missing archives prove nothing: most posts are never captured.
+              </p>
+            </section>
+            <section aria-label="About and takedown">
+              <h3 className="font-semibold">About · takedown</h3>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Contact: adityachitragar2.0@gmail.com. To request removal of a receipt you created, include the receipt link
+                (/r/…) and we will remove it.
+              </p>
+            </section>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      <p className="text-muted-foreground mt-3 text-center text-xs">
         Powered by the Internet Archive&apos;s Wayback Machine (not affiliated).{' '}
-        <a href="https://archive.org/donate" target="_blank" rel="noreferrer" className="underline">Donate to the Internet Archive</a>.
+        <a href="https://archive.org/donate" target="_blank" rel="noreferrer" className="underline">Donate</a>.
       </p>
     </footer>
   );

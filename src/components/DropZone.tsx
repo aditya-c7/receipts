@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react';
+import { ImagePlus, TriangleAlert } from 'lucide-react';
+import { Button } from './ui/button';
+import { Alert, AlertDescription } from './ui/alert';
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp'];
@@ -37,7 +40,7 @@ export default function DropZone({ onFile, disabled }: DropZoneProps) {
       data-testid="dropzone"
       tabIndex={0}
       aria-label="Drop a screenshot here, paste it, or choose a file"
-      className={`rounded-lg border-2 border-dashed p-6 text-center ${dragging ? 'border-black bg-gray-100' : 'border-gray-300'}`}
+      className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-primary bg-accent' : 'border-border'}`}
       onDragOver={(e) => {
         e.preventDefault();
         if (!disabled) setDragging(true);
@@ -56,15 +59,11 @@ export default function DropZone({ onFile, disabled }: DropZoneProps) {
         if (f) accept(f);
       }}
     >
-      <p className="text-sm font-medium">Drop a screenshot, paste it (Ctrl/⌘+V), or</p>
-      <button
-        type="button"
-        className="mt-2 rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-black"
-        disabled={disabled}
-        onClick={() => inputRef.current?.click()}
-      >
+      <ImagePlus aria-hidden className="text-muted-foreground mx-auto size-8" />
+      <p className="mt-2 text-sm font-medium">Drop a screenshot, paste it (Ctrl/⌘+V), or</p>
+      <Button type="button" className="mt-3" disabled={disabled} onClick={() => inputRef.current?.click()}>
         Choose file
-      </button>
+      </Button>
       <input
         data-testid="file-input"
         ref={inputRef}
@@ -73,11 +72,12 @@ export default function DropZone({ onFile, disabled }: DropZoneProps) {
         className="hidden"
         onChange={(e) => accept(e.target.files?.[0])}
       />
-      <p className="mt-2 text-xs opacity-60">PNG / JPEG / WebP up to 15 MB. OCR runs on-device; images never upload.</p>
+      <p className="text-muted-foreground mt-3 text-xs">PNG / JPEG / WebP up to 15 MB. OCR runs on-device; images never upload.</p>
       {error && (
-        <p data-testid="dropzone-error" role="alert" className="mt-2 text-sm text-red-700">
-          {error}
-        </p>
+        <Alert variant="destructive" data-testid="dropzone-error" className="mt-3 text-left">
+          <TriangleAlert />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
     </div>
   );

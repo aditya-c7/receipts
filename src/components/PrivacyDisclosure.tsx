@@ -7,8 +7,8 @@ interface PrivacyDisclosureProps {
 function Block({ title, payload, testid }: { title: string; payload: unknown; testid: string }) {
   return (
     <div>
-      <h4 className="mt-2 text-xs font-bold uppercase opacity-60">{title}</h4>
-      <pre data-testid={testid} className="mt-1 overflow-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800">
+      <h4 className="text-muted-foreground mt-3 text-xs font-semibold tracking-wide uppercase">{title}</h4>
+      <pre data-testid={testid} className="bg-muted mt-1 overflow-auto rounded-md p-3 font-mono text-xs">
         {JSON.stringify(payload, null, 2)}
       </pre>
     </div>
@@ -17,9 +17,9 @@ function Block({ title, payload, testid }: { title: string; payload: unknown; te
 
 export default function PrivacyDisclosure({ searchPayload, snapshotPayload, receiptPayload }: PrivacyDisclosureProps) {
   return (
-    <section data-testid="privacy-disclosure" aria-label="Exactly what leaves your device" className="rounded border p-3 text-sm">
-      <h3 className="font-bold">Exactly what leaves your device</h3>
-      <p className="mt-1 text-xs opacity-70">
+    <section data-testid="privacy-disclosure" aria-label="Exactly what leaves your device" className="text-sm">
+      <h3 className="font-semibold">Exactly what leaves your device</h3>
+      <p className="text-muted-foreground mt-1 text-xs">
         Screenshots and OCR text stay on-device. Only the JSON below is sent — and post text only when you create a receipt.
       </p>
       <Block title="Search request" payload={searchPayload} testid="privacy-search-payload" />

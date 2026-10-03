@@ -1,4 +1,10 @@
+import { Languages } from 'lucide-react';
 import type { DateCandidate, ParsedScreenshot } from '../../lib/types';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
+import { Badge } from './ui/badge';
+import { Checkbox } from './ui/checkbox';
 
 interface FieldEditorProps {
   parsed: ParsedScreenshot;
@@ -35,8 +41,6 @@ export default function FieldEditor({ parsed, onChange, highlightMissing = false
   const missingBody = highlightMissing && body.trim() === '';
   const uncertainHandle =
     !missingHandle && parsed.handle.source === 'ocr' && parsed.handle.confidence < 0.5;
-  const inputClass = (missing: boolean): string =>
-    `mt-1 w-full rounded border px-2 py-1${missing ? ' border-red-600' : ''}`;
 
   function markEdited(next: ParsedScreenshot): ParsedScreenshot {
     return { ...next, fieldsEdited: true };
@@ -57,60 +61,60 @@ export default function FieldEditor({ parsed, onChange, highlightMissing = false
   }
 
   return (
-    <section data-testid="field-editor" aria-label="Edit detected fields" className="rounded border p-3">
+    <section data-testid="field-editor" aria-label="Edit detected fields" className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span data-testid="language-chip" className="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-gray-800">
+        <Badge variant="secondary" data-testid="language-chip">
+          <Languages />
           {parsed.language || 'unknown'}
-        </span>
+        </Badge>
         {parsed.fieldsEdited && (
-          <span data-testid="fields-edited-badge" className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-900">
+          <Badge variant="outline" data-testid="fields-edited-badge">
             edited by you
-          </span>
+          </Badge>
         )}
         {parsed.platform !== 'x' && (
-          <label className="flex items-center gap-1 text-xs">
-            <input
+          <Label className="cursor-pointer gap-1.5 text-xs font-normal">
+            <Checkbox
               data-testid="platform-override"
-              type="checkbox"
               checked={false}
-              onChange={() => onChange(markEdited({ ...parsed, platform: 'x' }))}
+              onCheckedChange={() => onChange(markEdited({ ...parsed, platform: 'x' }))}
             />
             This is an X post
-          </label>
+          </Label>
         )}
       </div>
-      <label className="mt-3 block text-sm">
-        Handle
-        <input
+      <div className="grid gap-1.5">
+        <Label htmlFor="field-handle">Handle</Label>
+        <Input
+          id="field-handle"
           data-testid="field-handle"
-          className={inputClass(missingHandle)}
           aria-invalid={missingHandle}
           value={handle}
           placeholder="e.g. example_user"
           onChange={(e) => onHandle(e.target.value)}
         />
-        {missingHandle && <span className="text-xs text-red-700">Enter the @handle shown in the screenshot.</span>}
+        {missingHandle && <p className="text-destructive text-xs">Enter the @handle shown in the screenshot.</p>}
         {!missingHandle && uncertainHandle && (
-          <span className="text-xs text-amber-800">Handle looks uncertain — please verify it letter by letter.</span>
+          <p className="text-xs text-amber-700 dark:text-amber-400">Handle looks uncertain — please verify it letter by letter.</p>
         )}
-      </label>
-      <label className="mt-2 block text-sm">
-        Post date
-        <input
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="field-date">Post date</Label>
+        <Input
+          id="field-date"
           data-testid="field-date"
           type="date"
-          className={inputClass(missingDate)}
           aria-invalid={missingDate}
           value={firstDate}
           onChange={(e) => onDate(e.target.value)}
         />
-        {missingDate && <span className="text-xs text-red-700">Pick the post date (month/year is enough to start).</span>}
-      </label>
-      <label className="mt-2 block text-sm">
-        Post text
-        <textarea
+        {missingDate && <p className="text-destructive text-xs">Pick the post date (month/year is enough to start).</p>}
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="field-body">Post text</Label>
+        <Textarea
+          id="field-body"
           data-testid="field-body"
-          className={inputClass(missingBody)}
           aria-invalid={missingBody}
           rows={4}
           value={body}
@@ -118,8 +122,8 @@ export default function FieldEditor({ parsed, onChange, highlightMissing = false
             onChange(markEdited({ ...parsed, text: { value: e.target.value, confidence: 1, source: 'user' } }))
           }
         />
-        {missingBody && <span className="text-xs text-red-700">Paste or type the post text.</span>}
-      </label>
+        {missingBody && <p className="text-destructive text-xs">Paste or type the post text.</p>}
+      </div>
     </section>
   );
 }
