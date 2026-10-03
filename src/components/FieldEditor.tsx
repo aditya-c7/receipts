@@ -21,7 +21,7 @@ export function normalizeHandleInput(raw: string): string {
 /**
  * Build the dates value for a hand-picked day. Preserves the previously-read
  * time-of-day when the day is unchanged (the date picker has no time
- * control — dropping the minute would silently downgrade time-consistency).
+ * control - dropping the minute would silently downgrade time-consistency).
  */
 export function mergeDateEdit(prev: DateCandidate | undefined, iso: string): DateCandidate[] {
   if (iso === '') return [];
@@ -95,7 +95,7 @@ export default function FieldEditor({ parsed, onChange, highlightMissing = false
         />
         {missingHandle && <p className="text-destructive text-xs">Enter the @handle shown in the screenshot.</p>}
         {!missingHandle && uncertainHandle && (
-          <p className="text-xs text-amber-700 dark:text-amber-400">Handle looks uncertain — please verify it letter by letter.</p>
+          <p className="text-xs text-amber-700 dark:text-amber-400">Handle looks uncertain - please verify it letter by letter.</p>
         )}
       </div>
       <div className="grid gap-1.5">

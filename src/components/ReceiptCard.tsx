@@ -56,8 +56,8 @@ export default function ReceiptCard({ receipt, url }: ReceiptCardProps) {
           </a>
         </Button>
         <p className="text-muted-foreground text-xs">
-          This receipt proves the quoted text existed in the archived capture at the time shown — not that the
-          screenshot is untouched. Archive coverage is partial — no archive match does not mean it is not real.
+          This receipt proves the quoted text existed in the archived capture at the time shown - not that the
+          screenshot is untouched. Archive coverage is partial - no archive match does not mean it is not real.
           Most posts are never archived.
         </p>
       </CardContent>

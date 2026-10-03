@@ -20,15 +20,15 @@ export default function DropZone({ onFile, disabled }: DropZoneProps) {
     if (!f) return;
     const name = f.name.toLowerCase();
     if (name.endsWith('.heic') || name.endsWith('.heif') || f.type === 'image/heic' || f.type === 'image/heif') {
-      setError('HEIC photos are not supported — please export or screenshot as PNG/JPEG first.');
+      setError('HEIC photos are not supported - please export or screenshot as PNG/JPEG first.');
       return;
     }
     if (f.type && !ACCEPTED.includes(f.type)) {
-      setError(`Unsupported type ${f.type || 'unknown'} — use PNG, JPEG, or WebP.`);
+      setError(`Unsupported type ${f.type || 'unknown'} - use PNG, JPEG, or WebP.`);
       return;
     }
     if (f.size > MAX_BYTES) {
-      setError('Image is over the 15 MB cap — please use a smaller screenshot.');
+      setError('Image is over the 15 MB cap - please use a smaller screenshot.');
       return;
     }
     setError(null);

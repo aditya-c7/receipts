@@ -10,7 +10,7 @@ export default function NextSteps() {
             <a href={s.href} target="_blank" rel="noreferrer" className="underline">
               {s.label}
             </a>{' '}
-            <span className="opacity-70">— {s.blurb}</span>
+            <span className="opacity-70">- {s.blurb}</span>
           </li>
         ))}
       </ul>

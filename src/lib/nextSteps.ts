@@ -1,4 +1,4 @@
-// Helpful next steps shown after a check (links only — no verdict words here).
+// Helpful next steps shown after a check (links only - no verdict words here).
 export interface NextStep {
   label: string;
   href: string;
@@ -19,7 +19,7 @@ export const NEXT_STEPS: NextStep[] = [
   {
     label: 'Check the account history',
     href: 'https://x.com/settings/account',
-    blurb: 'Renames and deletions break archives — confirm the handle still belongs to the same account.',
+    blurb: 'Renames and deletions break archives - confirm the handle still belongs to the same account.',
   },
   {
     label: 'Support the Internet Archive',

@@ -3,7 +3,7 @@
 //
 // Security headers note: API responses carry nosniff + no-referrer +
 // frame-deny. The SPA previews Wayback captures in a sandboxed iframe
-// (sandbox="" + referrerpolicy) — never inline.
+// (sandbox="" + referrerpolicy) - never inline.
 //
 // zod schemas and GET /api/health below are frozen (Track C must not break them).
 import { Hono } from 'hono';
@@ -65,7 +65,7 @@ app.post('/api/wayback/search', async (c) => {
     const rl = await checkRateLimit(c.env, 'search', clientIp(c));
     if (!rl.ok) {
       return c.json(
-        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many searches — try again shortly.', retryAfterMs: rl.retryAfterMs } },
+        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many searches - try again shortly.', retryAfterMs: rl.retryAfterMs } },
         429,
       );
     }
@@ -90,7 +90,7 @@ app.post('/api/wayback/snapshot', async (c) => {
     const rl = await checkRateLimit(c.env, 'snapshot', clientIp(c));
     if (!rl.ok) {
       return c.json(
-        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many snapshot fetches — try again shortly.', retryAfterMs: rl.retryAfterMs } },
+        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many snapshot fetches - try again shortly.', retryAfterMs: rl.retryAfterMs } },
         429,
       );
     }
@@ -115,7 +115,7 @@ const tweetSchema = z.object({
 });
 
 // Authoritative live-tweet cross-check (X syndication endpoint, keyless).
-// Privacy: only the already-public tweet ID arrives here — no screenshot,
+// Privacy: only the already-public tweet ID arrives here - no screenshot,
 // no OCR text. Unofficial upstream: clients must always keep the archive
 // fallback (feature-flagged client-side).
 app.post('/api/x/tweet', async (c) => {
@@ -124,7 +124,7 @@ app.post('/api/x/tweet', async (c) => {
     const rl = await checkRateLimit(c.env, 'syndication', clientIp(c));
     if (!rl.ok) {
       return c.json(
-        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many live checks — try again shortly.', retryAfterMs: rl.retryAfterMs } },
+        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many live checks - try again shortly.', retryAfterMs: rl.retryAfterMs } },
         429,
       );
     }
@@ -154,7 +154,7 @@ app.post('/api/receipt', async (c) => {
     const rl = await checkRateLimit(c.env, 'receipt', clientIp(c));
     if (!rl.ok) {
       return c.json(
-        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many receipts — try again later.', retryAfterMs: rl.retryAfterMs } },
+        { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many receipts - try again later.', retryAfterMs: rl.retryAfterMs } },
         429,
       );
     }

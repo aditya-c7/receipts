@@ -128,7 +128,7 @@ export default function App() {
       })
       .catch(() => {
         setParsed(emptyParsed());
-        setCheckError("Couldn't read the screenshot automatically — fill in the fields and we'll re-check.");
+        setCheckError("Couldn't read the screenshot automatically - fill in the fields and we'll re-check.");
         setOcrStage(null);
       });
   }
@@ -161,7 +161,7 @@ export default function App() {
           setLastSnapshotPayload(
             v.best
               ? { snapshotTs: v.best.candidate.snapshotTs, originalUrl: v.best.candidate.originalUrl }
-              : { snapshotTs: '<none — no candidate>', originalUrl: '<none>' },
+              : { snapshotTs: '<none - no candidate>', originalUrl: '<none>' },
           );
         })
         .catch((e: unknown) => {
@@ -220,7 +220,7 @@ export default function App() {
     return (
       <main className="bg-background text-foreground min-h-screen">
         <div className="mx-auto max-w-2xl space-y-5 px-4 py-8">
-        <h1 className="text-2xl font-bold">Receipts — shared receipt</h1>
+        <h1 className="text-2xl font-bold">Receipts - shared receipt</h1>
         {permalink === null && <p className="mt-4 text-sm">Loading receipt…</p>}
         {permalink === 'missing' && <p className="mt-4 text-sm">Receipt not found. It may have been removed.</p>}
         {permalink !== null && permalink !== 'missing' && <div className="mt-4"><ReceiptCard receipt={permalink.view} url={permalink.url} /></div>}
@@ -251,7 +251,7 @@ export default function App() {
           <ReceiptText className="size-5" />
         </div>
         <div>
-          <h1 className="text-xl font-bold leading-tight">Receipts — Did they really post that?</h1>
+          <h1 className="text-xl font-bold leading-tight">Receipts - Did they really post that?</h1>
           <p className="text-muted-foreground text-sm">
             Drop a screenshot of an X/Twitter post. Reading runs on-device; only the handle + date window leave the device.
           </p>
@@ -318,7 +318,7 @@ export default function App() {
             {verdict.coverage.truncated ? ' (truncated)' : ''}.
             {verdict.coverage.repairedHandle && (
               <> Handle read as “@{parsed?.handle.value ?? '?'}” had no captures, so we checked the look-alike
-              “@{verdict.coverage.repairedHandle}” instead — scored with a mismatch cap.</>
+              “@{verdict.coverage.repairedHandle}” instead - scored with a mismatch cap.</>
             )}
           </p>
           {verdict.diff && <DiffView diff={verdict.diff} />}
@@ -416,7 +416,7 @@ function SiteFooter({ searchPayload, snapshotPayload }: { searchPayload: unknown
           <AccordionContent className="space-y-4">
             <PrivacyDisclosure searchPayload={searchPayload} snapshotPayload={snapshotPayload} />
             <section aria-label="Privacy">
-              <h3 className="font-semibold">Privacy — what leaves your device</h3>
+              <h3 className="font-semibold">Privacy - what leaves your device</h3>
               <table className="mt-2 w-full text-left text-xs">
                 <thead>
                   <tr className="border-b">
@@ -426,7 +426,7 @@ function SiteFooter({ searchPayload, snapshotPayload }: { searchPayload: unknown
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b"><td className="p-2">Screenshot pixels</td><td className="p-2">Never</td><td className="p-2">—</td></tr>
+                  <tr className="border-b"><td className="p-2">Screenshot pixels</td><td className="p-2">Never</td><td className="p-2">-</td></tr>
                   <tr className="border-b"><td className="p-2">Handle + date window</td><td className="p-2">Yes</td><td className="p-2">Every check (search request)</td></tr>
                   <tr className="border-b"><td className="p-2">Snapshot pointer (ts + URL)</td><td className="p-2">Yes</td><td className="p-2">Every check (snapshot request)</td></tr>
                   <tr className="border-b"><td className="p-2">Post text (OCR)</td><td className="p-2">Only with consent</td><td className="p-2">Create receipt dialog</td></tr>
@@ -438,7 +438,7 @@ function SiteFooter({ searchPayload, snapshotPayload }: { searchPayload: unknown
               <h3 className="font-semibold">How it works</h3>
               <p className="text-muted-foreground mt-1 text-xs">
                 Every post has an ID number that encodes its creation time. We decode that time and keep captures close to
-                the claimed date first (time-consistency ranking). Scores are text similarity (0–100) — not a probability,
+                the claimed date first (time-consistency ranking). Scores are text similarity (0-100) - not a probability,
                 and not a ruling on the screenshot. A receipt proves quoted text existed in a specific archived capture, not
                 that a screenshot is untouched. Missing archives prove nothing: most posts are never captured.
               </p>

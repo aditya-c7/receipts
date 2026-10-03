@@ -51,7 +51,7 @@ export default function VerdictCard({ verdict }: VerdictCardProps) {
               {copy.title(verdict.score)}
             </CardTitle>
             <CardDescription data-testid="verdict-score">
-              {pct == null ? 'Score unavailable — read the checks below.' : `Score ${pct}/100. Scores are similarity, not probability.`}
+              {pct == null ? 'Score unavailable - read the checks below.' : `Score ${pct}/100. Scores are similarity, not probability.`}
             </CardDescription>
           </div>
         </div>

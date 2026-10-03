@@ -51,7 +51,7 @@ export function buildNextSteps(handle: string, phrase: string, dateIso: string):
   });
 
   steps.push(
-    'If the account changed its handle, search the old handle — captures stay under the name used at archive time.',
+    'If the account changed its handle, search the old handle - captures stay under the name used at archive time.',
   );
   steps.push(
     'Deleted or protected posts are rarely archived. A missing capture does not confirm anything about the screenshot.',

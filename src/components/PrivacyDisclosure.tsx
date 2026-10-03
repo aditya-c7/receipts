@@ -20,7 +20,7 @@ export default function PrivacyDisclosure({ searchPayload, snapshotPayload, rece
     <section data-testid="privacy-disclosure" aria-label="Exactly what leaves your device" className="text-sm">
       <h3 className="font-semibold">Exactly what leaves your device</h3>
       <p className="text-muted-foreground mt-1 text-xs">
-        Screenshots and OCR text stay on-device. Only the JSON below is sent — and post text only when you create a receipt.
+        Screenshots and OCR text stay on-device. Only the JSON below is sent - and post text only when you create a receipt.
       </p>
       <Block title="Search request" payload={searchPayload} testid="privacy-search-payload" />
       <Block title="Snapshot request" payload={snapshotPayload} testid="privacy-snapshot-payload" />
