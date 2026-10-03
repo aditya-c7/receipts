@@ -19,7 +19,7 @@
 
 </div>
 
-> Drop a screenshot of an X post and find its archived original  with on-device OCR, Wayback lookup, and live-X triangulation.
+> Drop a screenshot of an X post and find its archived original with on-device OCR, Wayback lookup, and live-X triangulation.
 
 ## Why it is interesting
 
@@ -58,6 +58,20 @@ flowchart LR
 ```
 
 Receipt images and OCR output remain in the browser; the edge layer receives lookup inputs only.
+
+## See it work
+
+**Step 1 - Drop a screenshot.** OCR reads handle, date, and text on-device (field boxes shown).
+
+<img src="docs/screenshots/01-input-ocr.png" alt="Screenshot upload with on-device OCR field boxes" width="100%">
+
+**Step 2 - Get a verdict.** Archive match plus live-post triangulation, with checks and coverage.
+
+<img src="docs/screenshots/02-verdict-match.png" alt="Match verdict with live-post verification badge" width="100%">
+
+**Step 3 - Share a receipt.** Server-recomputed, QR-linked, immutable.
+
+<img src="docs/screenshots/03-receipt.png" alt="Shareable receipt card with QR code" width="100%">
 
 ## How it works
 
