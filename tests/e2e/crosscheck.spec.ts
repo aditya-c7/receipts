@@ -51,7 +51,7 @@ test('unreadable archive + live verification upgrades verdict and links original
     });
   });
 
-  await page.goto('/');
+  await page.goto('/?examples=1');
   await page.getByRole('button', { name: 'Example 4 (no match)' }).click();
   await expect(page.getByTestId('field-handle')).toBeVisible({ timeout: 15000 });
   await page.getByTestId('field-handle').fill(HANDLE);

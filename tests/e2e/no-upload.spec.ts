@@ -23,7 +23,7 @@ test('no image bytes ever upload', async ({ page }) => {
       }),
     });
   });
-  await page.goto('/');
+  await page.goto('/?examples=1');
   // Full check flow via bundled example (no file needed).
   await page.getByRole('button', { name: 'Example 2 (archived)' }).click();
   await expect(page.getByTestId('verdict-card')).toBeVisible({ timeout: 15000 });

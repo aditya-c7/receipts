@@ -45,7 +45,7 @@ test('receipt consent flow', async ({ page }) => {
     });
   });
 
-  await page.goto('/');
+  await page.goto('/?examples=1');
   await page.getByRole('button', { name: 'Example 1 (archived)' }).click();
   await expect(page.getByTestId('verdict-card')).toBeVisible({ timeout: 15000 });
   await page.getByTestId('create-receipt-open').click();

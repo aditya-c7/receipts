@@ -47,6 +47,11 @@ function permalinkId(): string | null {
   return m?.[1] ?? null;
 }
 
+/** Dev/QA escape hatch: sample screenshots render only with ?examples=1 (hidden in normal UI). */
+function showExamples(): boolean {
+  return new URLSearchParams(window.location.search).has('examples');
+}
+
 export default function App() {
   const [routeId] = useState<string | null>(() => permalinkId());
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -266,15 +271,17 @@ export default function App() {
       <section aria-label="Upload">
         <DropZone onFile={onFile} disabled={checking} />
 
-        <div className="mt-4">
-          <h2 className="mb-2 text-sm font-semibold">No screenshot? Try an example</h2>
-          <ExamplePicker
-            onPick={(p) => {
-              setParsed(p);
-              setReceipt(null);
-            }}
-          />
-        </div>
+        {showExamples() && (
+          <div className="mt-4">
+            <h2 className="mb-2 text-sm font-semibold">No screenshot? Try an example</h2>
+            <ExamplePicker
+              onPick={(p) => {
+                setParsed(p);
+                setReceipt(null);
+              }}
+            />
+          </div>
+        )}
       </section>
         </CardContent>
       </Card>

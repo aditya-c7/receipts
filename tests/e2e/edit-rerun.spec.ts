@@ -22,7 +22,7 @@ test('edit handle re-runs the check with the new handle', async ({ page }) => {
       }),
     });
   });
-  await page.goto('/');
+  await page.goto('/?examples=1');
   await page.getByRole('button', { name: 'Example 1 (archived)' }).click();
   await expect(page.getByTestId('verdict-card')).toBeVisible({ timeout: 15000 });
   // Edit the handle -> debounced re-run should POST the new handle.

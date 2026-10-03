@@ -18,7 +18,7 @@ import {
 } from '../../lib/config';
 import { textSimilarity } from '../../lib/match/similarity';
 import { scorePair } from '../../lib/match/score';
-import { wordDiff } from '../../lib/match/diff';
+import { diffForDisplay } from '../../lib/match/diff';
 import { decide } from '../../lib/verdict/engine';
 import {
   checkDateConsistent,
@@ -50,7 +50,7 @@ export function similarityScore(a: string, b: string): number {
 }
 
 export function toWordDiff(claimed: string, archived: string): Verdict['diff'] {
-  return wordDiff(claimed, archived);
+  return diffForDisplay(claimed, archived);
 }
 
 /**
@@ -278,7 +278,7 @@ export async function runCheckFlow(parsed: ParsedScreenshot, cb: CheckCallbacks 
     alternates: scored.slice(1, 4).map((s) => ({ candidate: s.candidate, textSim: s.textSim })),
     coverage,
     archiveError: false,
-    diff: best.archived.text ? wordDiff(claimedText, best.archived.text) : undefined,
+    diff: best.archived.text ? diffForDisplay(claimedText, best.archived.text) : undefined,
   });
   return withCrossCheck(base, {
     candidate: best.candidate,
@@ -409,7 +409,7 @@ async function withCrossCheck(base: Verdict, ctx: CrossCheckCtx): Promise<Verdic
       alternates: base.alternates,
       coverage: base.coverage,
       archiveError: false,
-      diff: wordDiff(claimedText, liveText),
+      diff: diffForDisplay(claimedText, liveText),
     });
     const cc: CrossCheck = {
       tweetId: candidate.tweetId,

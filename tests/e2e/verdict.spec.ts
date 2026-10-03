@@ -39,7 +39,7 @@ async function mockMatch(page: Page): Promise<void> {
 
 test('strong-match verdict path', async ({ page }) => {
   await mockMatch(page);
-  await page.goto('/');
+  await page.goto('/?examples=1');
   await page.getByRole('button', { name: 'Example 1 (archived)' }).click();
   await expect(page.getByTestId('verdict-card')).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId('verdict-title')).toContainText('Archived original found', { timeout: 15000 });
@@ -61,7 +61,7 @@ test('no-match verdict path', async ({ page }) => {
       }),
     });
   });
-  await page.goto('/');
+  await page.goto('/?examples=1');
   await page.getByRole('button', { name: 'Example 4 (no match)' }).click();
   await expect(page.getByTestId('verdict-card')).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId('verdict-title')).toContainText('No archive match found', { timeout: 15000 });

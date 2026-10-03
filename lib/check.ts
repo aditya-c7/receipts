@@ -9,7 +9,7 @@ import type { ArchivedPost, Candidate, ParsedScreenshot, Verdict } from './types
 import { decide } from './verdict/engine';
 import { checkTimeConsistent, checkDateConsistent, rankByTimeConsistency } from './wayback/timeConsistency';
 import { scorePair } from './match/score';
-import { wordDiff } from './match/diff';
+import { diffForDisplay } from './match/diff';
 
 export type CheckPhase = 'reading' | 'searching' | 'comparing' | 'done';
 
@@ -293,7 +293,7 @@ export async function runCheck(parsed: ParsedScreenshot, deps: CheckDeps): Promi
     },
     archiveError: false,
     ...(curBest && curBest.archived.text
-      ? { diff: wordDiff(claimedText, curBest.archived.text) }
+      ? { diff: diffForDisplay(claimedText, curBest.archived.text) }
       : {}),
   });
   emit({ phase: 'done' });
