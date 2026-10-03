@@ -1,93 +1,112 @@
-# Receipts - "Did they really post that?"
+# Receipts
 
-![license](https://img.shields.io/badge/license-MIT-green)
-![typescript](https://img.shields.io/badge/TypeScript-strict-blue)
-![infra](https://img.shields.io/badge/infra-%240_Free_Tier-blueviolet)
-![ocr](https://img.shields.io/badge/OCR-100%25_on--device-orange)
-![privacy](https://img.shields.io/badge/screenshots-never_uploaded-yellowgreen)
-![ci](https://github.com/aditya-c7/receipts/actions/workflows/ci.yml/badge.svg)
+> Drop a screenshot of an X post and find its archived original — with on-device OCR, Wayback lookup, and live-X triangulation.
 
-Drop in a screenshot of an X/Twitter post. In ~10 seconds you get
-**`Archived original found - 96% match`** (or an honest
-**`No archive match - that does not mean it is not real`**), a word-level
-diff, the original post link, and a shareable receipt.
+<p>
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=111827" alt="React 18" />
+  <img src="https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 5" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4" />
+  <img src="https://img.shields.io/badge/TypeScript-5_Strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5 Strict" />
+</p>
+<p>
+  <img src="https://img.shields.io/badge/Hono-4-E36002?style=flat-square&logo=hono&logoColor=white" alt="Hono 4" />
+  <img src="https://img.shields.io/badge/Cloudflare_Workers_%2B_D1-F48120?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Workers and D1" />
+  <img src="https://img.shields.io/badge/Upstash_Redis-00E9A3?style=flat-square&logo=redis&logoColor=white" alt="Upstash Redis" />
+  <img src="https://img.shields.io/badge/PaddleOCR-v5-0062B0?style=flat-square" alt="PaddleOCR v5" />
+  <img src="https://img.shields.io/badge/ONNX_Runtime-1.19-005CED?style=flat-square&logo=onnx&logoColor=white" alt="ONNX Runtime 1.19" />
+  <img src="https://img.shields.io/badge/Tesseract.js-5-5A5A5A?style=flat-square" alt="Tesseract.js 5" />
+</p>
+<p>
+  <img src="https://img.shields.io/badge/Vitest-2-6E9F18?style=flat-square&logo=vitest&logoColor=white" alt="Vitest" />
+  <img src="https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat-square&logo=playwright&logoColor=white" alt="Playwright" />
+  <img src="https://img.shields.io/badge/pnpm-9-F69220?style=flat-square&logo=pnpm&logoColor=white" alt="pnpm 9" />
+  <img src="https://img.shields.io/badge/License-MIT-22C55E?style=flat-square" alt="MIT License" />
+  <a href="https://github.com/aditya-c7/receipts/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/aditya-c7/receipts/ci.yml/CI?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI" alt="CI status" /></a>
+</p>
 
-## How it works
+## Why it is interesting
+
+- **Private by design:** OCR runs in the browser, so receipt images and extracted text do not need to leave the device.
+- **Archive-first search:** A Snowflake timestamp inferred from a post URL narrows Wayback queries to the relevant capture window.
+- **Evidence triangulation:** Archive results, live-X data, and extracted screenshot text are compared to surface the strongest match.
+
+## Tech stack
+
+| Area | Choice | Version | Purpose |
+| --- | --- | --- | --- |
+| Frontend | React, Vite, Tailwind CSS, TypeScript | 18, 5, 4, 5 | Fast, typed browser experience |
+| Edge API | Hono on Cloudflare Workers | 4 | Lightweight edge endpoints and integrations |
+| Data | Cloudflare D1, Upstash Redis | — | Persistent lookup data and rate-limit/cache support |
+| OCR | PaddleOCR, ONNX Runtime, Tesseract.js | v5, 1.19, 5 | On-device text extraction with fallback engines |
+| Quality | Vitest, Playwright, GitHub Actions | — | Unit tests, end-to-end coverage, and continuous integration |
+
+## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Browser["Browser - private"]
-    Shot[Screenshot] --> OCR[PaddleOCR / Tesseract]
-    OCR --> Parse[handle + date + text]
-    Parse --> Match[Fuzzy match + score]
-  end
-  Parse -- "handle + date window only" --> API[Hono API]
-  API --> CDX[Wayback CDX]
-  API --> Snap[Archived captures]
-  API --> XLive[X syndication]
-  Match --> Verdict[Verdict + receipt]
+    U[User screenshot] --> B[Browser: React + TypeScript]
+    B --> O[On-device OCR\nPaddleOCR / ONNX / Tesseract.js]
+    B --> W[Cloudflare Worker\nHono API]
+    W --> D[(Cloudflare D1)]
+    W --> R[(Upstash Redis)]
+    W --> A[Wayback Machine]
+    W --> X[Live X sources]
+    O --> M[Match and evidence view]
+    A --> M
+    X --> M
+    subgraph Privacy boundary
+      B
+      O
+    end
 ```
 
-1. OCR runs **on-device** (PaddleOCR PP-OCRv5 first, Tesseract fallback).
-   Pixels never leave the device.
-2. Only the **handle + date window** goes to the API, which searches the
-   Wayback Machine by Snowflake ID time buckets.
-3. The best candidate's public tweet ID is cross-checked against X itself.
-   Archive + live agree - `Verified against X + archive`.
-4. Receipts are opt-in and server-recomputed (unforgeable).
+Receipt images and OCR output remain in the browser; the edge layer receives lookup inputs only.
+
+## How it works
+
+1. Upload or paste a screenshot containing an X post.
+2. Run OCR locally to identify post text, usernames, timestamps, and URLs.
+3. Query archive and live sources through the Worker, then rank candidate matches.
+4. Review the matched post alongside its supporting archive and live evidence.
 
 ## Privacy
 
-Screenshots never upload. Post text uploads only when you create a receipt.
-The app shows the exact JSON of every request. A missing archive proves
-nothing - the app never calls anything fake.
+| Data | Handling |
+| --- | --- |
+| Screenshot image | Processed locally in the browser |
+| OCR text | Kept client-side for matching unless explicitly used in a lookup |
+| External queries | Sent only to the sources required for archive/live verification |
 
-## Run it free
+## Quick start
 
-| Piece | Free tier |
-|---|---|
-| App + API | Cloudflare Workers |
-| Cache + rate limits | Upstash Redis |
-| Receipt store | Cloudflare D1 |
-| OCR | Self-hosted WASM, no keys |
-| Archive | Wayback public APIs |
+**Requirements:** Node.js 20+, pnpm 9+, and a Cloudflare account for Worker/D1 bindings.
 
-## Quickstart
-
-```powershell
-$env:PATH = "$env:USERPROFILE\.npm-global;$env:PATH"
-npm install --global pnpm@9.12.0
-cd D:\Workspace\finder
+```bash
+git clone https://github.com/aditya-c7/receipts.git
+cd receipts
 pnpm install
-copy .dev.vars.example .dev.vars   # fill in values, never commit
-pnpm dev:all                        # web :5173 + api :8787
+cp .env.example .env
+cp .dev.vars.example .dev.vars
+pnpm dev
 ```
 
-Or double-click `host-local.cmd` - builds and hosts app + API from
-`http://127.0.0.1:8787` (keep the server window open).
+On Windows, use `host-local.cmd` to start the local hosting flow configured by the project.
 
-| Command | Purpose |
-|---|---|
-| `pnpm typecheck` / `lint` / `test` | Must all pass before every commit |
-| `pnpm e2e` | Playwright suite (real in-browser OCR) |
-| `pnpm build` | First-load budget: 150 kB gz |
-| `pnpm deploy` | Build + dry-run Worker deploy |
+## Scripts
 
-## Verdicts
+| Command | Description |
+| --- | --- |
+| `pnpm dev` | Start the Vite development server |
+| `pnpm build` | Create a production build |
+| `pnpm preview` | Preview the production build locally |
+| `pnpm lint` | Run ESLint |
+| `pnpm test` | Run Vitest tests |
+| `pnpm test:e2e` | Run Playwright end-to-end tests |
 
-`MATCH_STRONG` / `MATCH_LIKELY` / `MATCH_PARTIAL` -
-`POST_EXISTS_TEXT_UNREADABLE` - `NO_MATCH` (not proof of fakery) -
-`INSUFFICIENT_INPUT` - `ARCHIVE_UNAVAILABLE` - `UNSUPPORTED_PLATFORM`.
+## Live testing
 
-## Test it live
+Run the local app with valid environment bindings, upload a representative screenshot, and verify that the returned evidence links resolve before relying on a match.
 
-`$env:LIVE='1'; pnpm vitest run tests/unit/wayback/cdx.live.test.ts`
+## Credits and license
 
-## Credits
-
-Powered by the Internet Archive's Wayback Machine (not affiliated) -
-[donate](https://archive.org/donate). OCR: PaddleOCR (Apache-2.0),
-Tesseract (Apache-2.0). UI follows the shadcn pattern (MIT).
-
-MIT licensed - see [LICENSE](LICENSE). Agent rules: [AGENTS.md](AGENTS.md).
-Progress log: `docs/PROGRESS.md`.
+Built by [Aditya C](https://github.com/aditya-c7). Licensed under the [MIT License](LICENSE).
