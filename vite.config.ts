@@ -4,6 +4,14 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    // onnxruntime-web (lazy OCR chunk only) resolves its .wasm sibling via
+    // import.meta.url. esbuild pre-bundling corrupts that in dev (the .wasm
+    // URL serves HTML -> "expected magic word" at instantiate), so the dep
+    // stays unbundled on the dev server. Production builds are unaffected
+    // (rollup emits the real .wasm into dist/assets).
+    exclude: ['onnxruntime-web'],
+  },
   server: {
     // Bind IPv4 explicitly: on some hosts (Node 24) bare vite binds ::1
     // only, so 127.0.0.1-literal clients (playwright webServer url, the

@@ -59,6 +59,9 @@ test('dark X card OCR reads handle, date+time, body, platform', async ({ page })
   expect(handleVal.toLowerCase()).toBe('polymarket');
   expect(dateVal).toBe('2026-10-03');
   expect(bodyVal).toContain('prosecutors');
+  // NOTE: body punctuation fidelity (e.g. "Jae-myung" vs "Jaemyung") is the
+  // strong-engine track's job (PaddleOCR). The `best` model covers the
+  // header/date bands (search keys); matching is punctuation-insensitive.
   // Platform must be detected as X (Views signal) — no override checkbox.
   await expect(page.getByTestId('platform-override')).toHaveCount(0);
   // Filled fields must NEVER yield INSUFFICIENT_INPUT (empty wayback → NO_MATCH).

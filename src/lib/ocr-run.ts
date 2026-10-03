@@ -48,12 +48,19 @@ export function getEngine(): TesseractEngine {
 /**
  * Best-effort warm-up: start loading the worker/WASM/language data when the
  * browser is idle so the first real OCR is faster. Failures are swallowed —
- * runOcr() will simply load on demand instead.
+ * runOcr() will simply load on demand instead. Both models warm: `eng`
+ * (fast, full-image pass) and `best` (accurate, region re-OCR pass), plus the
+ * Paddle (PP-OCRv5) sessions which run first at OCR time.
  */
 export function warmUpOcr(): void {
   const kick = (): void => {
-    getEngine()
-      .warmUp('eng')
+    const eng = getEngine();
+    eng.warmUp('eng').catch(() => undefined);
+    eng.warmUp('best').catch(() => undefined);
+    // Paddle chunk stays lazy (dynamic import); warm failure just means the
+    // first runOcr() loads on demand and may fall back to Tesseract.
+    void import('./paddle-engine')
+      .then((m) => m.getPaddleEngine().warmUp('eng'))
       .catch(() => undefined);
   };
   if (typeof window.requestIdleCallback === 'function') {
@@ -145,9 +152,11 @@ interface CropLine {
 }
 
 /**
- * Re-OCR one band at 3x with PSM single-line. Returns crop-px lines, or null
- * when the pass fails or is empty. Callers keep whichever pass (full vs band)
- * has the higher mean confidence.
+ * Re-OCR one band at 3x with PSM single-line using the `best` (full
+ * accuracy) language model — small crops stay fast even with the big model,
+ * while the full-image pass keeps the `fast` model for speed. Returns
+ * crop-px lines, or null when the pass fails or is empty. Callers keep
+ * whichever pass (full vs band) has the higher mean confidence.
  */
 async function reOcrBand(
   eng: TesseractEngine,
@@ -166,7 +175,7 @@ async function reOcrBand(
   bctx.imageSmoothingQuality = 'high';
   bctx.drawImage(crop, band.x, band.y, sw, sh, 0, 0, big.width, big.height);
   try {
-    const res = await eng.recognizeWithParams(big as unknown as ImageBitmap, { lang: 'eng' }, {
+    const res = await eng.recognizeWithParams(big as unknown as ImageBitmap, { lang: 'best' }, {
       tessedit_pageseg_mode: '7',
     });
     const out = res.lines
@@ -206,6 +215,14 @@ function mergeBand(cropLines: CropLine[], band: BBox, bandLines: CropLine[]): Cr
   kept.splice(Math.max(0, insertAt), 0, ...sorted);
   return kept;
 }
+/**
+ * Records which OCR engine produced the current result on window (test
+ * surface for the Paddle/Tesseract A/B spec; never image data).
+ */
+function markEngine(name: 'paddle' | 'tesseract'): void {
+  (window as unknown as { __ocrEngine?: string }).__ocrEngine = name;
+}
+
 function clamp01(v: number): number {
   if (!Number.isFinite(v)) return 0;
   return Math.min(1, Math.max(0, v));
@@ -322,34 +339,72 @@ export async function runOcr(
       cctx.drawImage(full, 0, topCut, plan.targetW, cropH, 0, 0, plan.targetW, cropH);
     }
 
-    // NOTE (verified against tesseract.js v5.1.1
-    // src/worker/browser/loadImage.js): the browser loader accepts
-    // string/File/Blob/IMG/VIDEO/CANVAS/OffscreenCanvas but NOT ImageBitmap
-    // (an ImageBitmap falls through and becomes garbage bytes -> "Image file
-    // /input cannot be read!"). So the preprocessed CANVAS itself is handed
-    // to the engine (it PNG-encodes via toBlob internally); the cast only
-    // bridges lib/ocr/engine.ts, whose parameter is typed ImageBitmap.
-    const eng = getEngine();
-    const res = await eng.recognize(crop as unknown as ImageBitmap, {
-      lang: 'eng',
-      onProgress: (p, stage) => report(p, stage),
-    });
+    // Strong-OCR track: try Paddle (PP-OCRv5, on-device WASM) first. Its chunk
+    // stays lazy via dynamic import. Any throw — or zero usable lines — falls
+    // through to the byte-identical Tesseract path below. On success the
+    // paddle lines go STRAIGHT to parse (no Tesseract band re-OCR); the
+    // normalization + parse call afterwards is shared by both engines.
+    let cropLines: CropLine[] | null = null;
+    let ocrMs = 0;
+    try {
+      const { getPaddleEngine } = await import('./paddle-engine');
+      const pres = await getPaddleEngine().recognize(crop as unknown as ImageBitmap, {
+        lang: 'eng',
+        onProgress: (p, stage) => report(p, stage),
+      });
+      const usable = pres.lines.filter((l) => l.text.trim() !== '');
+      if (usable.length > 0) {
+        cropLines = usable.map((l) => ({
+          text: l.text,
+          confidence: l.confidence,
+          bbox: { ...l.bbox },
+        }));
+        ocrMs = pres.ms;
+        markEngine('paddle');
+        // Diagnostic surface for the A/B spec (texts + geometry, no pixels).
+        (window as unknown as { __ocrPaddleLines?: typeof cropLines }).__ocrPaddleLines =
+          cropLines;
+      }
+    } catch (err) {
+      // Surface the paddle failure reason for diagnostics (never image data).
+      (window as unknown as { __ocrPaddleError?: string }).__ocrPaddleError =
+        err instanceof Error ? `${err.name}: ${err.message}`.slice(0, 300) : 'unknown';
+      cropLines = null;
+    }
 
-    // SPEC §4.1 pass 2 — region re-OCR for precision: header (name+handle)
-    // and timestamp line are re-read at 3x with PSM single-line; whichever
-    // pass has the higher mean confidence wins, per band. Never throws: a
-    // failed re-OCR keeps the full-pass lines.
-    const pxW = crop.width;
-    const pxH = crop.height;
-    let cropLines: CropLine[] = res.lines.map((l) => ({
-      text: l.text,
-      confidence: l.confidence,
-      bbox: { ...l.bbox },
-    }));
-    for (const band of [headerBand(cropLines, pxW, pxH), dateBand(cropLines, pxW, pxH)]) {
-      if (band === null) continue;
-      const bandLines = await reOcrBand(eng, crop, band, report);
-      if (bandLines !== null) cropLines = mergeBand(cropLines, band, bandLines);
+    if (cropLines === null) {
+      // NOTE (verified against tesseract.js v5.1.1
+      // src/worker/browser/loadImage.js): the browser loader accepts
+      // string/File/Blob/IMG/VIDEO/CANVAS/OffscreenCanvas but NOT ImageBitmap
+      // (an ImageBitmap falls through and becomes garbage bytes -> "Image file
+      // /input cannot be read!"). So the preprocessed CANVAS itself is handed
+      // to the engine (it PNG-encodes via toBlob internally); the cast only
+      // bridges lib/ocr/engine.ts, whose parameter is typed ImageBitmap.
+      const eng = getEngine();
+      const res = await eng.recognize(crop as unknown as ImageBitmap, {
+        lang: 'eng',
+        onProgress: (p, stage) => report(p, stage),
+      });
+
+      // SPEC §4.1 pass 2 — region re-OCR for precision: header (name+handle)
+      // and timestamp line are re-read at 3x with PSM single-line; whichever
+      // pass has the higher mean confidence wins, per band. Never throws: a
+      // failed re-OCR keeps the full-pass lines.
+      const pxW = crop.width;
+      const pxH = crop.height;
+      let fullLines: CropLine[] = res.lines.map((l) => ({
+        text: l.text,
+        confidence: l.confidence,
+        bbox: { ...l.bbox },
+      }));
+      for (const band of [headerBand(fullLines, pxW, pxH), dateBand(fullLines, pxW, pxH)]) {
+        if (band === null) continue;
+        const bandLines = await reOcrBand(eng, crop, band, report);
+        if (bandLines !== null) fullLines = mergeBand(fullLines, band, bandLines);
+      }
+      cropLines = fullLines;
+      ocrMs = res.ms;
+      markEngine('tesseract');
     }
 
     // Engine confidences are 0..100; parse expects 0..1. Bboxes are mapped
@@ -361,7 +416,7 @@ export async function runOcr(
       bbox: toNormalizedSource(l.bbox, plan.targetW, plan.targetH, topCut),
     }));
     const parsed = parseScreenshot(lines);
-    return { ...parsed, ocrMs: res.ms, fieldsEdited: false };
+    return { ...parsed, ocrMs, fieldsEdited: false };
   } finally {
     src?.close();
   }
