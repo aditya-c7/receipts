@@ -2,27 +2,23 @@
 
 > Drop a screenshot of an X post and find its archived original — with on-device OCR, Wayback lookup, and live-X triangulation.
 
-<p>
-  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=111827" alt="React 18" />
-  <img src="https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 5" />
-  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4" />
-  <img src="https://img.shields.io/badge/TypeScript-5_Strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5 Strict" />
-</p>
-<p>
-  <img src="https://img.shields.io/badge/Hono-4-E36002?style=flat-square&logo=hono&logoColor=white" alt="Hono 4" />
-  <img src="https://img.shields.io/badge/Cloudflare_Workers_%2B_D1-F48120?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Workers and D1" />
-  <img src="https://img.shields.io/badge/Upstash_Redis-00E9A3?style=flat-square&logo=redis&logoColor=white" alt="Upstash Redis" />
-  <img src="https://img.shields.io/badge/PaddleOCR-v5-0062B0?style=flat-square" alt="PaddleOCR v5" />
-  <img src="https://img.shields.io/badge/ONNX_Runtime-1.19-005CED?style=flat-square&logo=onnx&logoColor=white" alt="ONNX Runtime 1.19" />
-  <img src="https://img.shields.io/badge/Tesseract.js-5-5A5A5A?style=flat-square" alt="Tesseract.js 5" />
-</p>
-<p>
-  <img src="https://img.shields.io/badge/Vitest-2-6E9F18?style=flat-square&logo=vitest&logoColor=white" alt="Vitest" />
-  <img src="https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat-square&logo=playwright&logoColor=white" alt="Playwright" />
-  <img src="https://img.shields.io/badge/pnpm-9-F69220?style=flat-square&logo=pnpm&logoColor=white" alt="pnpm 9" />
-  <img src="https://img.shields.io/badge/License-MIT-22C55E?style=flat-square" alt="MIT License" />
-  <a href="https://github.com/aditya-c7/receipts/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/aditya-c7/receipts/ci.yml/CI?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI" alt="CI status" /></a>
-</p>
+[![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=111827&style=flat-square)](https://react.dev/)
+[![Vite 5](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white&style=flat-square)](https://vitejs.dev/)
+[![Tailwind CSS 4](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white&style=flat-square)](https://tailwindcss.com/)
+[![TypeScript 5 Strict](https://img.shields.io/badge/TypeScript-5_Strict-3178C6?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
+
+[![Hono 4](https://img.shields.io/badge/Hono-4-E36002?logo=hono&logoColor=white&style=flat-square)](https://hono.dev/)
+[![Cloudflare Workers + D1](https://img.shields.io/badge/Cloudflare_Workers_%2B_D1-F48120?logo=cloudflare&logoColor=white&style=flat-square)](https://workers.cloudflare.com/)
+[![Upstash Redis](https://img.shields.io/badge/Upstash_Redis-00E9A3?logo=redis&logoColor=white&style=flat-square)](https://upstash.com/)
+[![PaddleOCR v5](https://img.shields.io/badge/PaddleOCR-v5-0062B0?style=flat-square)](https://github.com/PaddlePaddle/PaddleOCR)
+[![ONNX Runtime 1.19](https://img.shields.io/badge/ONNX_Runtime-1.19-005CED?logo=onnx&logoColor=white&style=flat-square)](https://onnxruntime.ai/)
+[![Tesseract.js 5](https://img.shields.io/badge/Tesseract.js-5-5A5A5A?style=flat-square)](https://tesseract.projectnaptha.com/)
+
+[![Vitest](https://img.shields.io/badge/Vitest-2-6E9F18?logo=vitest&logoColor=white&style=flat-square)](https://vitest.dev/)
+[![Playwright E2E](https://img.shields.io/badge/Playwright-E2E-2EAD33?logo=playwright&logoColor=white&style=flat-square)](https://playwright.dev/)
+[![pnpm 9](https://img.shields.io/badge/pnpm-9-F69220?logo=pnpm&logoColor=white&style=flat-square)](https://pnpm.io/)
+[![License MIT](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)](https://opensource.org/licenses/MIT)
+[![CI](https://img.shields.io/github/actions/workflow/status/aditya-c7/receipts/ci.yml/CI?branch=main&logo=githubactions&logoColor=white&style=flat-square)](https://github.com/aditya-c7/receipts/actions/workflows/ci.yml)
 
 ## Why it is interesting
 
