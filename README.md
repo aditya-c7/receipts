@@ -19,7 +19,7 @@
 
 </div>
 
-> Drop a screenshot of an X post and find its archived original — with on-device OCR, Wayback lookup, and live-X triangulation.
+> Drop a screenshot of an X post and find its archived original  with on-device OCR, Wayback lookup, and live-X triangulation.
 
 ## Why it is interesting
 
