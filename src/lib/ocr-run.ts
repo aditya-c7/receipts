@@ -65,6 +65,134 @@ export function warmUpOcr(): void {
   }
 }
 
+function meanConfidence(lines: Array<{ confidence: number }>): number {
+  if (lines.length === 0) return 0;
+  let sum = 0;
+  for (const l of lines) sum += l.confidence;
+  return sum / lines.length;
+}
+
+/** Union of line bboxes (crop px), padded and clamped to the crop size. */
+function bandUnion(
+  lines: Array<{ bbox: BBox }>,
+  cropW: number,
+  cropH: number,
+  pad = 8,
+): BBox | null {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const l of lines) {
+    x0 = Math.min(x0, l.bbox.x);
+    y0 = Math.min(y0, l.bbox.y);
+    x1 = Math.max(x1, l.bbox.x + l.bbox.w);
+    y1 = Math.max(y1, l.bbox.y + l.bbox.h);
+  }
+  if (!Number.isFinite(x0)) return null;
+  x0 = Math.max(0, Math.floor(x0 - pad));
+  y0 = Math.max(0, Math.floor(y0 - pad));
+  x1 = Math.min(cropW, Math.ceil(x1 + pad));
+  y1 = Math.min(cropH, Math.ceil(y1 + pad));
+  if (x1 - x0 < 40 || y1 - y0 < 12) return null;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/** Header band: first 3 non-empty full-pass lines (name + @handle live here). */
+function headerBand(
+  lines: Array<{ text: string; bbox: BBox }>,
+  cropW: number,
+  cropH: number,
+): BBox | null {
+  const head = lines.filter((l) => l.text.trim() !== '').slice(0, 3);
+  return bandUnion(head, cropW, cropH);
+}
+
+const DATE_HINT_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b|\d{1,2}[:/.-]\d|\b(am|pm)\b/i;
+
+/** Date band: bottom-most line that looks like a timestamp line. */
+function dateBand(
+  lines: Array<{ text: string; bbox: BBox }>,
+  cropW: number,
+  cropH: number,
+): BBox | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i];
+    if (l !== undefined && DATE_HINT_RE.test(l.text)) {
+      return bandUnion([l], cropW, cropH);
+    }
+  }
+  return null;
+}
+
+interface CropLine {
+  text: string;
+  confidence: number;
+  bbox: BBox;
+}
+
+/**
+ * Re-OCR one band at 3x with PSM single-line. Returns crop-px lines, or null
+ * when the pass fails or is empty. Callers keep whichever pass (full vs band)
+ * has the higher mean confidence.
+ */
+async function reOcrBand(
+  eng: TesseractEngine,
+  crop: HTMLCanvasElement,
+  band: BBox,
+  report: (p: number, stage: string) => void,
+): Promise<CropLine[] | null> {
+  const SCALE = 3;
+  const sw = Math.max(1, Math.round(band.w));
+  const sh = Math.max(1, Math.round(band.h));
+  const big = document.createElement('canvas');
+  big.width = sw * SCALE;
+  big.height = sh * SCALE;
+  const bctx = canvas2d(big, false);
+  bctx.imageSmoothingEnabled = true;
+  bctx.imageSmoothingQuality = 'high';
+  bctx.drawImage(crop, band.x, band.y, sw, sh, 0, 0, big.width, big.height);
+  try {
+    const res = await eng.recognizeWithParams(big as unknown as ImageBitmap, { lang: 'eng' }, {
+      tessedit_pageseg_mode: '7',
+    });
+    const out = res.lines
+      .filter((l) => l.text.trim() !== '')
+      .map((l) => ({
+        text: l.text,
+        confidence: l.confidence,
+        bbox: {
+          x: band.x + l.bbox.x / SCALE,
+          y: band.y + l.bbox.y / SCALE,
+          w: l.bbox.w / SCALE,
+          h: l.bbox.h / SCALE,
+        },
+      }));
+    report(0.85, 'recognize');
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Replace overlapped originals with band lines when the band wins on confidence. */
+function mergeBand(cropLines: CropLine[], band: BBox, bandLines: CropLine[]): CropLine[] {
+  const overlapped = cropLines.filter(
+    (l) =>
+      l.bbox.x + l.bbox.w / 2 >= band.x &&
+      l.bbox.x + l.bbox.w / 2 <= band.x + band.w &&
+      l.bbox.y + l.bbox.h / 2 >= band.y &&
+      l.bbox.y + l.bbox.h / 2 <= band.y + band.h,
+  );
+  if (overlapped.length === 0) return cropLines;
+  if (meanConfidence(bandLines) <= meanConfidence(overlapped)) return cropLines;
+  const insertAt = cropLines.indexOf(overlapped[0] as CropLine);
+  const overlappedSet = new Set(overlapped);
+  const kept = cropLines.filter((l) => !overlappedSet.has(l));
+  const sorted = [...bandLines].sort((a, b) => a.bbox.y - b.bbox.y || a.bbox.x - b.bbox.x);
+  kept.splice(Math.max(0, insertAt), 0, ...sorted);
+  return kept;
+}
 function clamp01(v: number): number {
   if (!Number.isFinite(v)) return 0;
   return Math.min(1, Math.max(0, v));
@@ -188,15 +316,33 @@ export async function runOcr(
     // /input cannot be read!"). So the preprocessed CANVAS itself is handed
     // to the engine (it PNG-encodes via toBlob internally); the cast only
     // bridges lib/ocr/engine.ts, whose parameter is typed ImageBitmap.
-    const res = await getEngine().recognize(crop as unknown as ImageBitmap, {
+    const eng = getEngine();
+    const res = await eng.recognize(crop as unknown as ImageBitmap, {
       lang: 'eng',
       onProgress: (p, stage) => report(p, stage),
     });
 
+    // SPEC §4.1 pass 2 — region re-OCR for precision: header (name+handle)
+    // and timestamp line are re-read at 3x with PSM single-line; whichever
+    // pass has the higher mean confidence wins, per band. Never throws: a
+    // failed re-OCR keeps the full-pass lines.
+    const pxW = crop.width;
+    const pxH = crop.height;
+    let cropLines: CropLine[] = res.lines.map((l) => ({
+      text: l.text,
+      confidence: l.confidence,
+      bbox: { ...l.bbox },
+    }));
+    for (const band of [headerBand(cropLines, pxW, pxH), dateBand(cropLines, pxW, pxH)]) {
+      if (band === null) continue;
+      const bandLines = await reOcrBand(eng, crop, band, report);
+      if (bandLines !== null) cropLines = mergeBand(cropLines, band, bandLines);
+    }
+
     // Engine confidences are 0..100; parse expects 0..1. Bboxes are mapped
     // back to normalized source coordinates BEFORE parsing so every field
     // bbox produced downstream (unions included) is already overlay-ready.
-    const lines: OcrInputLine[] = res.lines.map((l) => ({
+    const lines: OcrInputLine[] = cropLines.map((l) => ({
       text: l.text,
       confidence: clamp01(l.confidence / 100),
       bbox: toNormalizedSource(l.bbox, plan.targetW, plan.targetH, topCut),

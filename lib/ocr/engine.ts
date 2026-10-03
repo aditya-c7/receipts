@@ -83,6 +83,7 @@ interface RawPage {
 }
 interface MinimalWorker {
   recognize: (image: ImageBitmap) => Promise<{ data: RawPage }>;
+  setParameters?: (params: Record<string, string>) => Promise<void>;
   terminate: () => Promise<void>;
 }
 
@@ -94,6 +95,34 @@ function toBBox(b: RawBox): BBox {
   return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
 }
 
+function toLines(data: RawPage): OcrLine[] {
+  const lines: OcrLine[] = [];
+  const rawLines = data.lines ?? [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const raw = rawLines[i];
+    if (raw === undefined) continue;
+    lines.push({ text: raw.text, confidence: raw.confidence, bbox: toBBox(raw.bbox) });
+  }
+  return lines;
+}
+
+function toWords(data: RawPage, lines: OcrLine[]): OcrWord[] {
+  const words: OcrWord[] = [];
+  const rawLines = data.lines ?? [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const rawWords = rawLines[i]?.words ?? [];
+    for (const w of rawWords) {
+      words.push({ text: w.text, confidence: w.confidence, bbox: toBBox(w.bbox), lineIndex: i });
+    }
+  }
+  // Fallback: some builds only populate page.words.
+  if (lines.length === 0) {
+    for (const w of data.words ?? []) {
+      words.push({ text: w.text, confidence: w.confidence, bbox: toBBox(w.bbox), lineIndex: w.lineIndex ?? -1 });
+    }
+  }
+  return words;
+}
 function clampProgress(p: number | undefined): number {
   if (p === undefined || !Number.isFinite(p)) return 0;
   return Math.min(1, Math.max(0, p));
@@ -117,26 +146,43 @@ export class TesseractEngine implements OcrEngine {
     const started = Date.now();
     try {
       const { data } = await worker.recognize(img);
-      const lines: OcrLine[] = [];
-      const words: OcrWord[] = [];
-      const rawLines = data.lines ?? [];
-      for (let i = 0; i < rawLines.length; i++) {
-        const raw = rawLines[i];
-        if (raw === undefined) continue;
-        lines.push({ text: raw.text, confidence: raw.confidence, bbox: toBBox(raw.bbox) });
-        const rawWords = raw.words ?? [];
-        for (const w of rawWords) {
-          words.push({ text: w.text, confidence: w.confidence, bbox: toBBox(w.bbox), lineIndex: i });
-        }
-      }
-      // Fallback: some builds only populate page.words.
-      if (lines.length === 0) {
-        for (const w of data.words ?? []) {
-          words.push({ text: w.text, confidence: w.confidence, bbox: toBBox(w.bbox), lineIndex: w.lineIndex ?? -1 });
-        }
-      }
+      const lines = toLines(data);
+      const words = toWords(data, lines);
       return { lines, words, ms: Date.now() - started };
     } finally {
+      this.progressHandler = null;
+    }
+  }
+
+  /**
+   * Recognize with temporary Tesseract parameters (e.g. PSM single-line for
+   * region re-OCR). Params are restored to fully-automatic mode afterwards so
+   * later calls are unaffected. Workers without setParameters fall back to a
+   * plain recognize.
+   */
+  async recognizeWithParams(
+    img: ImageBitmap,
+    opts: RecognizeOptions,
+    params: Record<string, string>,
+  ): Promise<RecognizeResult> {
+    const worker = await this.getWorker(opts.lang);
+    if (typeof worker.setParameters !== 'function') {
+      return this.recognize(img, opts);
+    }
+    this.progressHandler = opts.onProgress ?? null;
+    const started = Date.now();
+    try {
+      await worker.setParameters(params);
+      const { data } = await worker.recognize(img);
+      const lines = toLines(data);
+      return { lines, words: toWords(data, lines), ms: Date.now() - started };
+    } finally {
+      try {
+        await worker.setParameters({ tessedit_pageseg_mode: '3' });
+      } catch {
+        // Best effort: a stale PSM only affects precision, never correctness
+        // of the full-image path (which always sets what it needs).
+      }
       this.progressHandler = null;
     }
   }

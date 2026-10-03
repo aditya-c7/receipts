@@ -124,6 +124,10 @@ export default function App() {
       setChecking(true);
       setCheckError(null);
       setProgress(null);
+      // Clear the previous verdict: it belongs to older field values and
+      // must never sit next to freshly-edited fields (stale-verdict trap).
+      setVerdict(null);
+      setReceipt(null);
       const win = windowFromParsed(parsed);
       setLastSearchPayload({ platform: 'x', handle: parsed.handle.value ?? '', window: win });
       runCheckFlow(parsed, {
@@ -245,9 +249,15 @@ export default function App() {
         <ScreenshotOverlay imageUrl={imageUrl} boxes={boxes} />
       )}
 
-      {parsed && <FieldEditor parsed={parsed} onChange={setParsed} />}
+      {parsed && (
+        <FieldEditor parsed={parsed} onChange={setParsed} highlightMissing={verdict?.code === 'INSUFFICIENT_INPUT'} />
+      )}
 
       {checkError && <p role="alert" className="text-sm text-red-700">{checkError}</p>}
+
+      {checking && !verdict && parsed && !routeId && (
+        <p role="status" className="text-sm opacity-70">Re-checking archives…</p>
+      )}
 
       {verdict && (
         <>
