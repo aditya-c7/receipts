@@ -3,27 +3,27 @@
 > Drop a screenshot of an X post and find its archived original — with on-device OCR, Wayback lookup, and live-X triangulation.
 
 <p align="center">
-  [![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=111827&style=flat-square)](https://react.dev/)
-  [![Vite 5](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white&style=flat-square)](https://vitejs.dev/)
-  [![Tailwind CSS 4](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white&style=flat-square)](https://tailwindcss.com/)
-  [![TypeScript 5 Strict](https://img.shields.io/badge/TypeScript-5_Strict-3178C6?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=111827&style=flat-square" alt="React 18" /></a>
+  <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white&style=flat-square" alt="Vite 5" /></a>
+  <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white&style=flat-square" alt="Tailwind CSS 4" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5_Strict-3178C6?logo=typescript&logoColor=white&style=flat-square" alt="TypeScript 5 Strict" /></a>
 </p>
 
 <p align="center">
-  [![Hono 4](https://img.shields.io/badge/Hono-4-E36002?logo=hono&logoColor=white&style=flat-square)](https://hono.dev/)
-  [![Cloudflare Workers + D1](https://img.shields.io/badge/Cloudflare_Workers_%2B_D1-F48120?logo=cloudflare&logoColor=white&style=flat-square)](https://workers.cloudflare.com/)
-  [![Upstash Redis](https://img.shields.io/badge/Upstash_Redis-00E9A3?logo=redis&logoColor=white&style=flat-square)](https://upstash.com/)
-  [![PaddleOCR v5](https://img.shields.io/badge/PaddleOCR-v5-0062B0?style=flat-square)](https://github.com/PaddlePaddle/PaddleOCR)
-  [![ONNX Runtime 1.19](https://img.shields.io/badge/ONNX_Runtime-1.19-005CED?logo=onnx&logoColor=white&style=flat-square)](https://onnxruntime.ai/)
-  [![Tesseract.js 5](https://img.shields.io/badge/Tesseract.js-5-5A5A5A?style=flat-square)](https://tesseract.projectnaptha.com/)
+  <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-4-E36002?logo=hono&logoColor=white&style=flat-square" alt="Hono 4" /></a>
+  <a href="https://workers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare_Workers_%2B_D1-F48120?logo=cloudflare&logoColor=white&style=flat-square" alt="Cloudflare Workers and D1" /></a>
+  <a href="https://upstash.com/"><img src="https://img.shields.io/badge/Upstash_Redis-00E9A3?logo=redis&logoColor=white&style=flat-square" alt="Upstash Redis" /></a>
+  <a href="https://github.com/PaddlePaddle/PaddleOCR"><img src="https://img.shields.io/badge/PaddleOCR-v5-0062B0?style=flat-square" alt="PaddleOCR v5" /></a>
+  <a href="https://onnxruntime.ai/"><img src="https://img.shields.io/badge/ONNX_Runtime-1.19-005CED?logo=onnx&logoColor=white&style=flat-square" alt="ONNX Runtime 1.19" /></a>
+  <a href="https://tesseract.projectnaptha.com/"><img src="https://img.shields.io/badge/Tesseract.js-5-5A5A5A?style=flat-square" alt="Tesseract.js 5" /></a>
 </p>
 
 <p align="center">
-  [![Vitest](https://img.shields.io/badge/Vitest-2-6E9F18?logo=vitest&logoColor=white&style=flat-square)](https://vitest.dev/)
-  [![Playwright E2E](https://img.shields.io/badge/Playwright-E2E-2EAD33?logo=playwright&logoColor=white&style=flat-square)](https://playwright.dev/)
-  [![pnpm 9](https://img.shields.io/badge/pnpm-9-F69220?logo=pnpm&logoColor=white&style=flat-square)](https://pnpm.io/)
-  [![License MIT](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)](https://opensource.org/licenses/MIT)
-  [![CI](https://img.shields.io/github/actions/workflow/status/aditya-c7/receipts/ci.yml/CI?branch=main&logo=githubactions&logoColor=white&style=flat-square)](https://github.com/aditya-c7/receipts/actions/workflows/ci.yml)
+  <a href="https://vitest.dev/"><img src="https://img.shields.io/badge/Vitest-2-6E9F18?logo=vitest&logoColor=white&style=flat-square" alt="Vitest" /></a>
+  <a href="https://playwright.dev/"><img src="https://img.shields.io/badge/Playwright-E2E-2EAD33?logo=playwright&logoColor=white&style=flat-square" alt="Playwright E2E" /></a>
+  <a href="https://pnpm.io/"><img src="https://img.shields.io/badge/pnpm-9-F69220?logo=pnpm&logoColor=white&style=flat-square" alt="pnpm 9" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-22C55E?style=flat-square" alt="MIT License" /></a>
+  <a href="https://github.com/aditya-c7/receipts/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/aditya-c7/receipts/ci.yml/CI?branch=main&logo=githubactions&logoColor=white&style=flat-square" alt="CI" /></a>
 </p>
 
 ## Why it is interesting
